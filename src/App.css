@@ -460,3 +460,11 @@ footer.advanced {
   border-top: 2px solid #2980b9;
   box-shadow: 0 -2px 10px rgba(0,0,0,0.3);
 }
+.gallery-image{
+  display: flex;
+  width: 100px;
+  height: 100px;
+}
+.image-gallery{
+  display: flex;
+}

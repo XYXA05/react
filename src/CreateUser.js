@@ -1,110 +1,75 @@
-// src/CreateUser.js
 import React, { useState } from 'react';
+import axios from 'axios';
 
 const CreateUser = () => {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-    name: '',
-    type: 'realtor',
-    profile_picture1: '',
-    profile_picture2: '',
-    quote: '',
-    team_leader_id: ''
-  });
-  const [errors, setErrors] = useState({});
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [userType, setUserType] = useState('realtor');
+  const [message, setMessage] = useState('');
 
-  const validate = () => {
-    const errors = {};
-    if (!formData.username || formData.username.length < 4) {
-      errors.username = 'Username must be at least 4 characters';
-    }
-    if (!formData.password || formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters';
-    }
-    return errors;
-  };
-
-  const onSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const validationErrors = validate();
-    if (Object.keys(validationErrors).length !== 0) {
-      setErrors(validationErrors);
-      return;
-    }
     try {
-      const res = await fetch('http://127.0.0.1:8000/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      if (res.ok) {
-        console.log('User created successfully');
-        setFormData({
-          username: '',
-          password: '',
-          name: '',
-          type: 'realtor',
-          profile_picture1: '',
-          profile_picture2: '',
-          quote: '',
-          team_leader_id: ''
-        });
-      } else {
-        console.error('Error creating user');
-      }
+      // Choose endpoint based on userType
+      const endpoint = userType === 'realtor' ? 'http://127.0.0.1:8000/register/realtor' : 'http://127.0.0.1:8000/register/team_leader';
+      const payload = { username, password, name };
+      const response = await axios.post(endpoint, payload);
+      setMessage(`User ${response.data.username} created successfully!`);
+      // Clear form if needed
+      setUsername('');
+      setPassword('');
+      setName('');
     } catch (error) {
-      console.error('Error creating user', error);
+      console.error(error);
+      setMessage('Error creating user: ' + error.response?.data.detail || error.message);
     }
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   return (
-    <div className="container">
-      <h2 className="animated-heading">Create User</h2>
-      <form onSubmit={onSubmit}>
-        <div>
-          <label htmlFor="username">Username</label>
-          <input id="username" name="username" value={formData.username} onChange={handleChange} required />
-          {errors.username && <div style={{ color: 'red' }}>{errors.username}</div>}
-        </div>
-        <div>
-          <label htmlFor="password">Password</label>
-          <input id="password" type="password" name="password" value={formData.password} onChange={handleChange} required autoComplete="current-password" />
-          {errors.password && <div style={{ color: 'red' }}>{errors.password}</div>}
-        </div>
-        <div>
-          <label htmlFor="name">Name</label>
-          <input id="name" name="name" value={formData.name} onChange={handleChange} />
-        </div>
-        <div>
-          <label htmlFor="type">Type</label>
-          <input id="type" name="type" value={formData.type} onChange={handleChange} />
-        </div>
-        <div>
-          <label htmlFor="profile_picture1">Profile Picture 1</label>
-          <input id="profile_picture1" name="profile_picture1" value={formData.profile_picture1} onChange={handleChange} />
-        </div>
-        <div>
-          <label htmlFor="profile_picture2">Profile Picture 2</label>
-          <input id="profile_picture2" name="profile_picture2" value={formData.profile_picture2} onChange={handleChange} />
-        </div>
-        <div>
-          <label htmlFor="quote">Quote</label>
-          <input id="quote" name="quote" value={formData.quote} onChange={handleChange} />
-        </div>
-        <div>
-          <label htmlFor="team_leader_id">Team Leader ID</label>
-          <input id="team_leader_id" type="number" name="team_leader_id" value={formData.team_leader_id} onChange={handleChange} />
-        </div>
-        <button type="submit" disabled={Object.keys(errors).length > 0}>Create User</button>
+    <div>
+      <h1>Create New User</h1>
+      <form onSubmit={handleSubmit}>
+         <div>
+            <label>Username:</label>
+            <input 
+              type="text" 
+              value={username} 
+              onChange={(e)=>setUsername(e.target.value)} 
+              required 
+            />
+         </div>
+         <div>
+            <label>Password:</label>
+            <input 
+              type="password" 
+              value={password} 
+              onChange={(e)=>setPassword(e.target.value)} 
+              required 
+            />
+         </div>
+         <div>
+            <label>Name:</label>
+            <input 
+              type="text" 
+              value={name} 
+              onChange={(e)=>setName(e.target.value)} 
+            />
+         </div>
+         <div>
+            <label>User Type:</label>
+            <select 
+              value={userType} 
+              onChange={(e)=>setUserType(e.target.value)}
+            >
+                <option value="realtor">Realtor</option>
+                <option value="team_leader">Team Leader</option>
+            </select>
+         </div>
+         <button type="submit">Create User</button>
       </form>
+      {message && <p>{message}</p>}
     </div>
   );
 };
-
 export default CreateUser;

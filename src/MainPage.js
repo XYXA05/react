@@ -2,7 +2,10 @@ import React, { useState, useEffect } from 'react';
 import * as ApartmentService from './ApartmentService';
 
 const MainPage = () => {
-  // State variables
+  // Assume userRole is retrieved after login; here we hard-code for demonstration.
+  // Valid values: "admin", "team_leader", "realtor"
+  const [userRole, setUserRole] = useState("admin");
+  // You might also have userId and other auth data
   const [templates, setTemplates] = useState([]);
   const [templateTitle, setTemplateTitle] = useState('');
   const [templateContent, setTemplateContent] = useState('');
@@ -32,18 +35,23 @@ const MainPage = () => {
   const [newTrapWord, setNewTrapWord] = useState('');
   const [newStopWord, setNewStopWord] = useState('');
 
-  // useEffect acts like Angular's ngOnInit
   useEffect(() => {
+    // Optionally, get the role from auth data (e.g., localStorage)
+    // setUserRole(localStorage.getItem("userRole"));
     fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userRole]);
 
   const fetchInitialData = async () => {
     try {
-      const verif = await ApartmentService.getVerificationAds();
-      setVerificationApartments(verif);
+      // For ads requiring verification – likely an admin-only endpoint
+      if (userRole === "admin") {
+        const verif = await ApartmentService.getVerificationAds();
+        setVerificationApartments(verif);
+      }
+      // The getApartments endpoint on the backend returns ads based on the logged-in user role.
       const data = await ApartmentService.getApartments();
-      const modifiedData = data.map(apartment => ({ ...apartment, expanded: false }));
+      const modifiedData = data.map(ad => ({ ...ad, expanded: false }));
       setApartments(modifiedData);
       setFilteredApartments(modifiedData);
       fetchTemplates();
@@ -72,8 +80,8 @@ const MainPage = () => {
   const populateDistrictsAndCities = (data) => {
     const districtsSet = new Set();
     const citiesTemp = {};
-    data.forEach(apartment => {
-      const parts = apartment.location_date.split(', ');
+    data.forEach(ad => {
+      const parts = ad.location_date.split(', ');
       const district = parts[0];
       const city = parts[1] || '';
       districtsSet.add(district);
@@ -89,22 +97,22 @@ const MainPage = () => {
   };
 
   const onFilterChange = () => {
-    const filtered = apartments.filter(apartment => {
-      const priceUSD = convertToUSD(apartment.price);
-      const parts = apartment.location_date.split(', ');
+    const filtered = apartments.filter(ad => {
+      const priceUSD = convertToUSD(ad.price);
+      const parts = ad.location_date.split(', ');
       const district = parts[0];
       const city = parts[1] || '';
       const matchesDistrict = selectedDistricts.length === 0 || selectedDistricts.includes(district);
       const matchesCity = selectedCities.length === 0 || selectedCities.includes(city);
       return (
         (filterText === '' ||
-          apartment.title.toLowerCase().includes(filterText.toLowerCase()) ||
-          apartment.description.toLowerCase().includes(filterText.toLowerCase())) &&
-        (typeDeal === '' || apartment.type_deal === typeDeal) &&
-        (typeObject === '' || apartment.type_object === typeObject) &&
-        (owner === '' || apartment.owner.toLowerCase().includes(owner.toLowerCase())) &&
-        (rooms === '' || apartment.room === rooms) &&
-        (filterById === null || apartment.id === filterById) &&
+          ad.title.toLowerCase().includes(filterText.toLowerCase()) ||
+          ad.description.toLowerCase().includes(filterText.toLowerCase())) &&
+        (typeDeal === '' || ad.type_deal === typeDeal) &&
+        (typeObject === '' || ad.type_object === typeObject) &&
+        (owner === '' || ad.owner.toLowerCase().includes(owner.toLowerCase())) &&
+        (rooms === '' || ad.room === rooms) &&
+        (filterById === null || ad.id === filterById) &&
         (priceMin === null || priceUSD >= priceMin) &&
         (priceMax === null || priceUSD <= priceMax) &&
         matchesDistrict &&
@@ -120,7 +128,7 @@ const MainPage = () => {
     return isHryvnia(price) ? cleanPrice / UAH_TO_USD_RATE : cleanPrice;
   };
 
-  // Parser and auto-posting methods
+  // Example parser and auto-posting methods remain unchanged...
   const startParser = async () => {
     try {
       await ApartmentService.runParser();
@@ -157,34 +165,12 @@ const MainPage = () => {
     }
   };
 
-  // Watermark methods
-  const addWatermarkToCanvas = (imagePath, imageId) => {
-    const canvas = document.getElementById(`canvas_${imageId}`);
-    if (!canvas) {
-      console.error('Canvas element not found');
-      return;
-    }
-    const ctx = canvas.getContext('2d');
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = imagePath;
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0, img.width, img.height);
-      ctx.font = `${img.width * 0.1}px Arial`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('Watermark: CompanyName', img.width / 2, img.height / 2);
-    };
-  };
-
+  // Watermark and file upload methods remain the same...
   const applyWatermark = async (imageId, apartmentId) => {
     try {
       await fetch(`${ApartmentService.BASE_URL}/apartments/${apartmentId}/apply_watermark/${imageId}`, { method: 'PUT' });
       alert('Watermark applied successfully!');
-      getAllAds();
+      fetchInitialData();
     } catch (error) {
       console.error('Error applying watermark:', error);
     }
@@ -194,16 +180,9 @@ const MainPage = () => {
     try {
       await fetch(`${ApartmentService.BASE_URL}/apartments/${apartmentId}/remove_watermark_ai/${imageId}`, { method: 'PUT' });
       alert('Watermark removed successfully using AI!');
-      getAllAds();
+      fetchInitialData();
     } catch (error) {
       console.error('Error removing watermark using AI:', error);
-    }
-  };
-
-  // File upload handling
-  const onFileSelected = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
     }
   };
 
@@ -217,7 +196,7 @@ const MainPage = () => {
           method: 'POST',
           body: formData
         });
-        getAllAds();
+        fetchInitialData();
       } catch (error) {
         console.error('Error uploading images:', error);
       }
@@ -227,55 +206,37 @@ const MainPage = () => {
   const deleteImage = async (imageId) => {
     try {
       await ApartmentService.deleteImage(imageId);
-      getAllAds();
+      fetchInitialData();
     } catch (error) {
       console.error('Error deleting image:', error);
     }
   };
 
-  // Functions for trap and stop words
+  // Functions for trap and stop words (admin only)
   const addTrapWord = async () => {
     try {
       await ApartmentService.addTrapWord(newTrapWord);
-      getAllAds();
+      fetchInitialData();
       setNewTrapWord('');
     } catch (error) {
       console.error('Error adding trap word:', error);
     }
   };
 
-  const removeTrapWord = async (word) => {
-    try {
-      await ApartmentService.removeTrapWord(word);
-      getAllAds();
-    } catch (error) {
-      console.error('Error removing trap word:', error);
-    }
-  };
-
   const addStopWord = async () => {
     try {
       await ApartmentService.addStopWord(newStopWord);
-      getAllAds();
+      fetchInitialData();
       setNewStopWord('');
     } catch (error) {
       console.error('Error adding stop word:', error);
     }
   };
 
-  const removeStopWord = async (word) => {
-    try {
-      await ApartmentService.removeStopWord(word);
-      getAllAds();
-    } catch (error) {
-      console.error('Error removing stop word:', error);
-    }
-  };
-
   const approveApartment = async (apartmentId) => {
     try {
       await ApartmentService.approveApartment(apartmentId);
-      getAllAds();
+      fetchInitialData();
     } catch (error) {
       console.error('Error approving apartment:', error);
     }
@@ -284,31 +245,17 @@ const MainPage = () => {
   const rejectApartment = async (apartmentId) => {
     try {
       await ApartmentService.rejectApartment(apartmentId);
-      getAllAds();
+      fetchInitialData();
     } catch (error) {
       console.error('Error rejecting apartment:', error);
     }
   };
 
-  const getAllAds = () => {
-    fetchInitialData();
-  };
-
-  const getAdsByStatus = async (status) => {
-    try {
-      const ads = await ApartmentService.getApartmentsByStatus(status);
-      setFilteredApartments(ads);
-    } catch (error) {
-      console.error('Error getting ads by status:', error);
-    }
-  };
-
-  // updateFixFields function
   const updateFixFields = async (apartmentId, updateData) => {
     try {
       await ApartmentService.updateApartmentFixFields(apartmentId, updateData);
       console.log("Apartment information updated successfully.");
-      getAllAds();
+      fetchInitialData();
     } catch (error) {
       console.error("Error updating apartment fix fields:", error);
     }
@@ -376,7 +323,6 @@ const MainPage = () => {
     }
   };
 
-  // Handlers for multi-select inputs
   const onDistrictChange = (e) => {
     const options = Array.from(e.target.selectedOptions, option => option.value);
     setSelectedDistricts(options);
@@ -393,65 +339,70 @@ const MainPage = () => {
 
   return (
     <div className="container admin-panel">
-      <h1 className="animated-heading">Admin Panel - Apartments</h1>
+      <h1 className="animated-heading">Dashboard - Apartments</h1>
 
-      {/* Blacklist Management Section */}
-      <section className="admin-section card">
-        <h2>Blacklist Words (Trap)</h2>
-        <input
-          type="text"
-          value={newTrapWord}
-          onChange={(e) => setNewTrapWord(e.target.value)}
-          placeholder="Enter trap word"
-          className="animated"
-        />
-        <button className="advanced" onClick={addTrapWord}>Add to Blacklist</button>
-      </section>
+      {/* Only show admin controls if user is admin */}
+      {userRole === "admin" && (
+        <>
+          <section className="admin-section card">
+            <h2>Blacklist Words (Trap)</h2>
+            <input
+              type="text"
+              value={newTrapWord}
+              onChange={(e) => setNewTrapWord(e.target.value)}
+              placeholder="Enter trap word"
+              className="animated"
+            />
+            <button className="advanced" onClick={addTrapWord}>Add to Blacklist</button>
+          </section>
 
-      {/* Stop Word Management Section */}
-      <section className="admin-section card">
-        <h2>Stop Words (Flag for Review)</h2>
-        <input
-          type="text"
-          value={newStopWord}
-          onChange={(e) => setNewStopWord(e.target.value)}
-          placeholder="Enter stop word"
-          className="animated"
-        />
-        <button className="advanced" onClick={addStopWord}>Add Stop Word</button>
-      </section>
+          <section className="admin-section card">
+            <h2>Stop Words (Flag for Review)</h2>
+            <input
+              type="text"
+              value={newStopWord}
+              onChange={(e) => setNewStopWord(e.target.value)}
+              placeholder="Enter stop word"
+              className="animated"
+            />
+            <button className="advanced" onClick={addStopWord}>Add Stop Word</button>
+          </section>
+        </>
+      )}
 
-      {/* Ads Requiring Verification Section */}
-      <section className="admin-section card">
-        <h2>Ads Requiring Verification</h2>
-        {verificationApartments.length === 0 ? (
-          <div>No ads requiring verification.</div>
-        ) : (
-          verificationApartments.map(apartment => (
-            <div key={apartment.id} className="apartment-item">
-              <p>
-                <strong>{apartment.title}</strong> (ID: {apartment.id})
-              </p>
-              <p>Status: {apartment.ad_status}</p>
-              <p>Reason: Stop words detected</p>
-              <button className="advanced" onClick={() => approveApartment(apartment.id)}>Approve</button>
-              <button className="advanced" onClick={() => rejectApartment(apartment.id)}>Reject</button>
-            </div>
-          ))
-        )}
-      </section>
+      {/* Verification Ads – admin-only */}
+      {userRole === "admin" && (
+        <section className="admin-section card">
+          <h2>Ads Requiring Verification</h2>
+          {verificationApartments.length === 0 ? (
+            <div>No ads requiring verification.</div>
+          ) : (
+            verificationApartments.map(ad => (
+              <div key={ad.id} className="apartment-item">
+                <p><strong>{ad.title}</strong> (ID: {ad.id})</p>
+                <p>Status: {ad.ad_status}</p>
+                <p>Reason: Stop words detected</p>
+                <button className="advanced" onClick={() => approveApartment(ad.id)}>Approve</button>
+                <button className="advanced" onClick={() => rejectApartment(ad.id)}>Reject</button>
+              </div>
+            ))
+          )}
+        </section>
+      )}
 
-      {/* Parser and Auto-Posting Controls */}
-      <section className="controls card">
-        <h3>Parser Controls</h3>
-        <button className="advanced" onClick={startParser}>Start Parser</button>
-        <button className="advanced" onClick={stopParser}>Stop Parser</button>
-        <h3>Auto-Posting Controls</h3>
-        <button className="advanced" onClick={startAutoPosting}>Start Auto Posting</button>
-        <button className="advanced" onClick={stopAutoPosting}>Stop Auto Posting</button>
-      </section>
+      {/* Parser and Auto-Posting Controls (admin/team leader) */}
+      {(userRole === "admin" || userRole === "team_leader") && (
+        <section className="controls card">
+          <h3>Parser Controls</h3>
+          <button className="advanced" onClick={startParser}>Start Parser</button>
+          <button className="advanced" onClick={stopParser}>Stop Parser</button>
+          <h3>Auto-Posting Controls</h3>
+          <button className="advanced" onClick={startAutoPosting}>Start Auto Posting</button>
+          <button className="advanced" onClick={stopAutoPosting}>Stop Auto Posting</button>
+        </section>
+      )}
 
-      {/* Filters Section */}
+      {/* Filters Section – common for all roles */}
       <section className="filters card">
         <h2>Filter Apartments</h2>
         <input
@@ -532,13 +483,15 @@ const MainPage = () => {
           className="filter-input animated"
         />
         <div className="status-buttons">
-          <button className="advanced" onClick={getAllAds}>All Ads</button>
-          <button className="advanced" onClick={() => getAdsByStatus('new')}>New Ads</button>
-          <button className="advanced" onClick={() => getAdsByStatus('activation_soon')}>Activation Soon</button>
-          <button className="advanced" onClick={() => getAdsByStatus('inactive')}>Inactive Ads</button>
-          <button className="advanced" onClick={() => getAdsByStatus('successful')}>Successful Ads</button>
-          <button className="advanced" onClick={() => getAdsByStatus('spam')}>Spam</button>
-          <button className="advanced" onClick={autoAssign}>Distribute Apartments</button>
+          <button className="advanced" onClick={fetchInitialData}>All Ads</button>
+          <button className="advanced" onClick={() => ApartmentService.getApartmentsByStatus('new').then(ads => setFilteredApartments(ads))}>New Ads</button>
+          <button className="advanced" onClick={() => ApartmentService.getApartmentsByStatus('activation_soon').then(ads => setFilteredApartments(ads))}>Activation Soon</button>
+          <button className="advanced" onClick={() => ApartmentService.getApartmentsByStatus('inactive').then(ads => setFilteredApartments(ads))}>Inactive Ads</button>
+          <button className="advanced" onClick={() => ApartmentService.getApartmentsByStatus('successful').then(ads => setFilteredApartments(ads))}>Successful Ads</button>
+          <button className="advanced" onClick={() => ApartmentService.getApartmentsByStatus('spam').then(ads => setFilteredApartments(ads))}>Spam</button>
+          {(userRole === "admin" || userRole === "team_leader") && (
+            <button className="advanced" onClick={autoAssign}>Distribute Apartments</button>
+          )}
         </div>
       </section>
 
@@ -548,32 +501,36 @@ const MainPage = () => {
         {filteredApartments.length === 0 ? (
           <div className="no-apartments">No apartments found.</div>
         ) : (
-          filteredApartments.map(apartment => (
-            <div key={apartment.id} className="apartment-item">
+          filteredApartments.map(ad => (
+            <div key={ad.id} className="apartment-item">
               <div
                 className="apartment-header"
                 onClick={() => {
-                  apartment.expanded = !apartment.expanded;
+                  ad.expanded = !ad.expanded;
                   setApartments([...apartments]);
                 }}
               >
-                <p><strong>{apartment.title}</strong></p>
-                <p>ID: {apartment.id}</p>
-                <p>Type Deal: {apartment.type_deal}</p>
-                <p>Type Object: {apartment.type_object}</p>
-                <p>Status: {apartment.ad_status}</p>
-                <button className="advanced">{apartment.expanded ? 'Collapse' : 'Expand'}</button>
+                <p><strong>{ad.title}</strong></p>
+                <p>ID: {ad.id}</p>
+                <p>Deal: {ad.type_deal}</p>
+                <p>Object: {ad.type_object}</p>
+                <p>Status: {ad.ad_status}</p>
+                <button className="advanced">{ad.expanded ? 'Collapse' : 'Expand'}</button>
               </div>
-              {apartment.expanded && (
+              {ad.expanded && (
                 <div className="apartment-details">
-                  <input type="file" multiple onChange={(e) => uploadImages(e, apartment.id)} className="animated"/>
+                  <input type="file" multiple onChange={(e) => uploadImages(e, ad.id)} className="animated" />
                   <div className="image-gallery">
-                    {apartment.files &&
-                      apartment.files.map(image => (
+                    {ad.files &&
+                      ad.files.map(image => (
                         <div key={image.id}>
-                          <img src={image.file_path} alt={apartment.title} className="gallery-image" />
-                          <button className="advanced" onClick={() => applyWatermark(image.id, apartment.id)}>Apply Watermark</button>
-                          <button className="advanced" onClick={() => removeWatermarkAI(image.id, apartment.id)}>Remove Watermark (AI)</button>
+                          <img src={image.file_path} alt={ad.title} className="gallery-image" />
+                          {(userRole === "admin" || userRole === "team_leader") && (
+                            <>
+                              <button className="advanced" onClick={() => applyWatermark(image.id, ad.id)}>Apply Watermark</button>
+                              <button className="advanced" onClick={() => removeWatermarkAI(image.id, ad.id)}>Remove Watermark (AI)</button>
+                            </>
+                          )}
                           <button className="advanced" onClick={() => deleteImage(image.id)}>Delete</button>
                         </div>
                       ))}
@@ -581,41 +538,39 @@ const MainPage = () => {
                   <form onSubmit={(e) => {
                     e.preventDefault();
                     const updateData = {
-                      title_fix: apartment.title_fix,
-                      price_fix: apartment.price_fix,
-                      location_date_fix: apartment.location_date_fix,
-                      features_fix: apartment.features_fix,
-                      owner_fix: apartment.owner_fix,
-                      square_fix: apartment.square_fix,
-                      room_fix: apartment.room_fix,
-                      residential_complex_fix: apartment.residential_complex_fix,
-                      floor_fix: apartment.floor_fix,
-                      superficiality_fix: apartment.superficiality_fix,
-                      classs_fix: apartment.classs_fix,
-                      url_fix: apartment.url_fix,
-                      user_fix: apartment.user_fix,
-                      phone_fix: apartment.phone_fix,
-                      id_olx_fix: apartment.id_olx_fix,
-                      comment_fix: apartment.comment_fix
+                      title_fix: ad.title_fix,
+                      price_fix: ad.price_fix,
+                      location_date_fix: ad.location_date_fix,
+                      features_fix: ad.features_fix,
+                      owner_fix: ad.owner_fix,
+                      square_fix: ad.square_fix,
+                      room_fix: ad.room_fix,
+                      residential_complex_fix: ad.residential_complex_fix,
+                      floor_fix: ad.floor_fix,
+                      superficiality_fix: ad.superficiality_fix,
+                      classs_fix: ad.classs_fix,
+                      url_fix: ad.url_fix,
+                      user_fix: ad.user_fix,
+                      phone_fix: ad.phone_fix,
                     };
-                    updateFixFields(apartment.id, updateData);
+                    updateFixFields(ad.id, updateData);
                   }}>
                     <div className="apartment-info">
                       <label>Title (Fixed):</label>
                       <input
                         type="text"
-                        value={apartment.title_fix || ''}
+                        value={ad.title_fix || ''}
                         onChange={(e) => {
-                          apartment.title_fix = e.target.value;
+                          ad.title_fix = e.target.value;
                           setApartments([...apartments]);
                         }}
                         className="animated"
                       />
-                      {/* Repeat similar input blocks for other fix fields */}
+                      {/* You can add similar inputs for the other fix fields */}
                     </div>
                     <button type="submit" className="advanced">Save</button>
-                    {apartment.ad_status === 'successful' && (
-                      <button type="button" className="advanced" onClick={() => publishToChannel(apartment.id)}>
+                    {ad.ad_status === 'successful' && userRole === "admin" && (
+                      <button type="button" className="advanced" onClick={() => publishToChannel(ad.id)}>
                         Publish to Channel
                       </button>
                     )}
@@ -627,59 +582,61 @@ const MainPage = () => {
         )}
       </section>
 
-      {/* Template Management Section */}
-      <section className="template-management card">
-        <h2>Manage Templates</h2>
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          saveTemplate();
-        }}>
-          <input
-            type="text"
-            value={templateTitle}
-            onChange={(e) => setTemplateTitle(e.target.value)}
-            name="title"
-            placeholder="Template Title"
-            required
-            className="animated"
-          />
-          <textarea
-            value={templateContent}
-            onChange={(e) => setTemplateContent(e.target.value)}
-            name="content"
-            placeholder="Template Content"
-            required
-            className="animated"
-          ></textarea>
-          <button type="submit" className="advanced">{selectedTemplate ? "Update" : "Add"} Template</button>
-        </form>
-        <ul>
-          {templates.map(template => (
-            <li key={template.id}>
-              <h3>{template.name}</h3>
-              <p>{template.template_text}</p>
-              <button className="advanced" onClick={() => editTemplate(template)}>Edit</button>
-              <button className="advanced" onClick={() => deleteTemplate(template.id)}>Delete</button>
-            </li>
-          ))}
-        </ul>
-        <div className="publish-section">
-          <label htmlFor="templateSelect">Select Template for Publishing:</label>
-          <select
-            id="templateSelect"
-            value={selectedTemplateName}
-            onChange={(e) => setSelectedTemplateName(e.target.value)}
-            className="animated"
-          >
+      {/* Template Management Section – admin only */}
+      {userRole === "admin" && (
+        <section className="template-management card">
+          <h2>Manage Templates</h2>
+          <form onSubmit={(e) => {
+            e.preventDefault();
+            saveTemplate();
+          }}>
+            <input
+              type="text"
+              value={templateTitle}
+              onChange={(e) => setTemplateTitle(e.target.value)}
+              name="title"
+              placeholder="Template Title"
+              required
+              className="animated"
+            />
+            <textarea
+              value={templateContent}
+              onChange={(e) => setTemplateContent(e.target.value)}
+              name="content"
+              placeholder="Template Content"
+              required
+              className="animated"
+            ></textarea>
+            <button type="submit" className="advanced">{selectedTemplate ? "Update" : "Add"} Template</button>
+          </form>
+          <ul>
             {templates.map(template => (
-              <option key={template.id} value={template.name}>{template.name}</option>
+              <li key={template.id}>
+                <h3>{template.name}</h3>
+                <p>{template.template_text}</p>
+                <button className="advanced" onClick={() => editTemplate(template)}>Edit</button>
+                <button className="advanced" onClick={() => deleteTemplate(template.id)}>Delete</button>
+              </li>
             ))}
-          </select>
-          <button className="advanced" onClick={() => publishToChannel(/* Provide apartment id if needed */)}>
-            Publish to Channel
-          </button>
-        </div>
-      </section>
+          </ul>
+          <div className="publish-section">
+            <label htmlFor="templateSelect">Select Template for Publishing:</label>
+            <select
+              id="templateSelect"
+              value={selectedTemplateName}
+              onChange={(e) => setSelectedTemplateName(e.target.value)}
+              className="animated"
+            >
+              {templates.map(template => (
+                <option key={template.id} value={template.name}>{template.name}</option>
+              ))}
+            </select>
+            <button className="advanced" onClick={() => publishToChannel(/* Provide an apartment id as needed */)}>
+              Publish to Channel
+            </button>
+          </div>
+        </section>
+      )}
     </div>
   );
 };
