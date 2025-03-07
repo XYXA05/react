@@ -17,7 +17,7 @@ const ChannelControl = () => {
   // Змініть значення у масиві, щоб зберігати потрібні вам дані (наприклад, "good" замість "owner")
   const categories = ['good', 'bad', 'owner', 'sent to telegram channel', 'successful'];
   const typeDeals = ['kvartiry', 'doma', 'posutochno-pochasovo'];
-  const typeObjects = ['prodazha-kvartir', 'prodazha-domov', 'posutochno-pochasovo-doma', 'posutochno-pochasovo-kvartiry'];
+  const typeObjects = ['prodazha-kvartir', 'prodazha-domov', 'dolgosrochnaya-arenda-kvartir', 'posutochno-pochasovo-kvartiry'];
 
   const apiUrl = 'http://127.0.0.1:8000';
 

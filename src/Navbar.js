@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 
-const Navbar = () => {
+
+const Navbar = (onLogout) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   
   const toggleDarkMode = () => {
@@ -15,12 +16,17 @@ const Navbar = () => {
   };
 
   return (
-    <nav style={{ padding: '1rem', background: '#2c3e50' }}>
-      <ul style={{ listStyle: 'none', display: 'flex', gap: '1rem', margin: 0 }}>
-      <li><Link to="/channel-control">Channel Control</Link></li>
-      <li><Link to="/create-user">Create User</Link></li>
-      <li><Link to="/">Home</Link></li>
+    <nav>
+      <ul style={{ display: 'flex', listStyle: 'none', gap: '1rem' }}>
+        <li><Link to="/dashboard">Dashboard</Link></li>
+        <li><Link to="/properties">Properties</Link></li>
+        <li><Link to="/orders">Orders</Link></li>
+        <li><Link to="/schedule">Schedule</Link></li>
+        <li><Link to="/clients">Clients</Link></li>
+        <li><Link to="/statistics">Statistics</Link></li>
+        <li><button onClick={onLogout}>Logout</button></li>
       </ul>
+      <hr />
       <button className="dark-toggle" onClick={toggleDarkMode}>
         {isDarkMode ? '☀' : '🌙'}
       </button>
