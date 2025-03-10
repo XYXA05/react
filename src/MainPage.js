@@ -1,11 +1,19 @@
+// src/MainPage.js
 import React, { useState, useEffect } from 'react';
 import * as ApartmentService from './ApartmentService';
+import RentalCalendar from './RentalCalendar'; // Make sure you have this component
+import Navigation from './Navigation';
 
 const MainPage = () => {
-  // Assume userRole is retrieved after login; here we hard-code for demonstration.
-  // Valid values: "admin", "team_leader", "realtor"
+  // For demonstration we hard-code the user role.
   const [userRole, setUserRole] = useState("admin");
-  // You might also have userId and other auth data
+  // Maintain a view state for internal view switching.
+  const [view, setView] = useState("dashboard");
+
+  // State for selected property (to show its calendar)
+  const [selectedProperty, setSelectedProperty] = useState(null);
+
+  // State variables for templates, apartments and filters
   const [templates, setTemplates] = useState([]);
   const [templateTitle, setTemplateTitle] = useState('');
   const [templateContent, setTemplateContent] = useState('');
@@ -26,6 +34,7 @@ const MainPage = () => {
   const [owner, setOwner] = useState('');
   const [rooms, setRooms] = useState('');
   const UAH_TO_USD_RATE = 41.5;
+  // Added missing state variables for filter options:
   const [typeDealOptions, setTypeDealOptions] = useState([]);
   const [typeObjectOptions, setTypeObjectOptions] = useState([]);
   const [ownerOptions, setOwnerOptions] = useState([]);
@@ -35,21 +44,21 @@ const MainPage = () => {
   const [newTrapWord, setNewTrapWord] = useState('');
   const [newStopWord, setNewStopWord] = useState('');
 
+  // State for free days filter (for calendar search)
+  const [freeFrom, setFreeFrom] = useState('');
+  const [freeTo, setFreeTo] = useState('');
+
   useEffect(() => {
-    // Optionally, get the role from auth data (e.g., localStorage)
-    // setUserRole(localStorage.getItem("userRole"));
     fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole]);
 
   const fetchInitialData = async () => {
     try {
-      // For ads requiring verification – likely an admin-only endpoint
       if (userRole === "admin") {
         const verif = await ApartmentService.getVerificationAds();
         setVerificationApartments(verif);
       }
-      // The getApartments endpoint on the backend returns ads based on the logged-in user role.
       const data = await ApartmentService.getApartments();
       const modifiedData = data.map(ad => ({ ...ad, expanded: false }));
       setApartments(modifiedData);
@@ -128,7 +137,7 @@ const MainPage = () => {
     return isHryvnia(price) ? cleanPrice / UAH_TO_USD_RATE : cleanPrice;
   };
 
-  // Example parser and auto-posting methods remain unchanged...
+  // (Other functions such as startParser, stopParser, auto-posting, watermark, etc. remain unchanged.)
   const startParser = async () => {
     try {
       await ApartmentService.runParser();
@@ -165,7 +174,6 @@ const MainPage = () => {
     }
   };
 
-  // Watermark and file upload methods remain the same...
   const applyWatermark = async (imageId, apartmentId) => {
     try {
       await fetch(`${ApartmentService.BASE_URL}/apartments/${apartmentId}/apply_watermark/${imageId}`, { method: 'PUT' });
@@ -212,7 +220,7 @@ const MainPage = () => {
     }
   };
 
-  // Functions for trap and stop words (admin only)
+  // Admin functions for trap/stop words
   const addTrapWord = async () => {
     try {
       await ApartmentService.addTrapWord(newTrapWord);
@@ -261,7 +269,7 @@ const MainPage = () => {
     }
   };
 
-  // Template methods
+  // Template management
   const saveTemplate = async () => {
     const templateData = {
       category: 'telegram_channel',
@@ -323,6 +331,7 @@ const MainPage = () => {
     }
   };
 
+  // Filter handlers for districts and cities
   const onDistrictChange = (e) => {
     const options = Array.from(e.target.selectedOptions, option => option.value);
     setSelectedDistricts(options);
@@ -337,72 +346,22 @@ const MainPage = () => {
     onFilterChange();
   };
 
+  // If a property is selected, show the RentalCalendar view
+  if (selectedProperty) {
+    return (
+      <RentalCalendar 
+        propertyId={selectedProperty.id} 
+        onBack={() => setSelectedProperty(null)} 
+      />
+    );
+  }
+
   return (
     <div className="container admin-panel">
       <h1 className="animated-heading">Dashboard - Apartments</h1>
 
-      {/* Only show admin controls if user is admin */}
-      {userRole === "admin" && (
-        <>
-          <section className="admin-section card">
-            <h2>Blacklist Words (Trap)</h2>
-            <input
-              type="text"
-              value={newTrapWord}
-              onChange={(e) => setNewTrapWord(e.target.value)}
-              placeholder="Enter trap word"
-              className="animated"
-            />
-            <button className="advanced" onClick={addTrapWord}>Add to Blacklist</button>
-          </section>
 
-          <section className="admin-section card">
-            <h2>Stop Words (Flag for Review)</h2>
-            <input
-              type="text"
-              value={newStopWord}
-              onChange={(e) => setNewStopWord(e.target.value)}
-              placeholder="Enter stop word"
-              className="animated"
-            />
-            <button className="advanced" onClick={addStopWord}>Add Stop Word</button>
-          </section>
-        </>
-      )}
-
-      {/* Verification Ads – admin-only */}
-      {userRole === "admin" && (
-        <section className="admin-section card">
-          <h2>Ads Requiring Verification</h2>
-          {verificationApartments.length === 0 ? (
-            <div>No ads requiring verification.</div>
-          ) : (
-            verificationApartments.map(ad => (
-              <div key={ad.id} className="apartment-item">
-                <p><strong>{ad.title}</strong> (ID: {ad.id})</p>
-                <p>Status: {ad.ad_status}</p>
-                <p>Reason: Stop words detected</p>
-                <button className="advanced" onClick={() => approveApartment(ad.id)}>Approve</button>
-                <button className="advanced" onClick={() => rejectApartment(ad.id)}>Reject</button>
-              </div>
-            ))
-          )}
-        </section>
-      )}
-
-      {/* Parser and Auto-Posting Controls (admin/team leader) */}
-      {(userRole === "admin" || userRole === "team_leader") && (
-        <section className="controls card">
-          <h3>Parser Controls</h3>
-          <button className="advanced" onClick={startParser}>Start Parser</button>
-          <button className="advanced" onClick={stopParser}>Stop Parser</button>
-          <h3>Auto-Posting Controls</h3>
-          <button className="advanced" onClick={startAutoPosting}>Start Auto Posting</button>
-          <button className="advanced" onClick={stopAutoPosting}>Stop Auto Posting</button>
-        </section>
-      )}
-
-      {/* Filters Section – common for all roles */}
+      {/* Filters Section */}
       <section className="filters card">
         <h2>Filter Apartments</h2>
         <input
@@ -515,6 +474,9 @@ const MainPage = () => {
                 <p>Deal: {ad.type_deal}</p>
                 <p>Object: {ad.type_object}</p>
                 <p>Status: {ad.ad_status}</p>
+                <button onClick={() => setSelectedProperty(ad)}>
+                            View Calendar
+                          </button>
                 <button className="advanced">{ad.expanded ? 'Collapse' : 'Expand'}</button>
               </div>
               {ad.expanded && (
@@ -532,6 +494,8 @@ const MainPage = () => {
                             </>
                           )}
                           <button className="advanced" onClick={() => deleteImage(image.id)}>Delete</button>
+                          {/* Fix: use the current ad object instead of "prop" */}
+                          <button onClick={() => setSelectedProperty(ad)}>View Calendar</button>
                         </div>
                       ))}
                   </div>
@@ -566,7 +530,6 @@ const MainPage = () => {
                         }}
                         className="animated"
                       />
-                      {/* You can add similar inputs for the other fix fields */}
                     </div>
                     <button type="submit" className="advanced">Save</button>
                     {ad.ad_status === 'successful' && userRole === "admin" && (
@@ -582,7 +545,7 @@ const MainPage = () => {
         )}
       </section>
 
-      {/* Template Management Section – admin only */}
+      {/* Template Management Section for Admin */}
       {userRole === "admin" && (
         <section className="template-management card">
           <h2>Manage Templates</h2>

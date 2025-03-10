@@ -1,24 +1,23 @@
 // App.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import './App.css';
-import ChannelControl from './ChannelControl'; // Import the ChannelControl component
-import MainPage from './MainPage';
-const API_URL = 'http://localhost:8000'; // adjust to your backend URL
+import './CalendarView.css'; // CSS for calendar styling
+import ChannelControl from './ChannelControl'; // Channel control component
+import MainPage from './MainPage'; // Apartments list & filters
+import RentalCalendar from './RentalCalendar'; // Calendar view component
+import OrdersList from './OrdersList'; // Orders view (separate component)
+import ClientsList from './ClientsList'; // Clients view (separate component)
+
+const API_URL = 'http://localhost:8000'; // Adjust to your backend URL
 
 function App() {
-  // Token is stored in state and localStorage for persistence
+  // Authentication token and view control state
   const [token, setToken] = useState(localStorage.getItem('token') || '');
-  // view is one of: 'login', 'dashboard', 'apartments', 'orders', 'clients', 'statistics', 
-  // 'documents', 'settings', 'schedule', 'rentalCalendar', 'reviewsAndDeals', 'call'
+  // Valid views: 'login', 'dashboard', 'apartments', 'orders', 'clients', 'statistics',
+  // 'documents', 'settings', 'schedule', 'rentalCalendar', 'reviewsAndDeals', 'call', 'channelControl'
   const [view, setView] = useState(token ? 'dashboard' : 'login');
   const [error, setError] = useState('');
-
-  // Data for certain views (example: apartments, orders, clients, statistics)
-  const [apartments, setApartments] = useState([]);
-  const [orders, setOrders] = useState([]);
-  const [clients, setClients] = useState([]);
-  const [stats, setStats] = useState(null);
 
   // --- LOGIN HANDLER ---
   const handleLogin = async (e) => {
@@ -26,7 +25,6 @@ function App() {
     const username = e.target.username.value;
     const password = e.target.password.value;
     try {
-      // Your API expects form data (adjust if necessary)
       const response = await axios.post(
         `${API_URL}/login`,
         new URLSearchParams({ username, password }),
@@ -50,75 +48,7 @@ function App() {
     setView('login');
   };
 
-  // --- FETCH FUNCTIONS (for demo views) ---
-  const fetchApartments = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/get_apartments/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setApartments(response.data);
-      setError('');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to fetch apartments.');
-    }
-  };
-
-  const fetchOrders = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/get_orders/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setOrders(response.data);
-      setError('');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to fetch orders.');
-    }
-  };
-
-  const fetchClients = async () => {
-    try {
-      // For demo, we reuse the orders endpoint and filter orders that are not closed.
-      const response = await axios.get(`${API_URL}/get_orders/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const activeClients = response.data.filter(
-        (order) =>
-          order.ed_status && order.ed_status.toLowerCase() !== 'closed'
-      );
-      setClients(activeClients);
-      setError('');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to fetch clients.');
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const response = await axios.get(`${API_URL}/statistics/finance`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setStats(response.data);
-      setError('');
-    } catch (err) {
-      console.error(err);
-      setError('Failed to fetch statistics.');
-    }
-  };
-
-  // --- When view changes, fetch data for certain views ---
-  useEffect(() => {
-    if (token) {
-      if (view === 'apartments') fetchApartments();
-      else if (view === 'orders') fetchOrders();
-      else if (view === 'clients') fetchClients();
-      else if (view === 'statistics') fetchStats();
-    }
-  }, [view, token]);
-
-  // --- Render different views ---
+  // Render login form if user is not authenticated.
   if (view === 'login') {
     return (
       <div style={{ padding: '20px' }}>
@@ -143,14 +73,20 @@ function App() {
       <Navigation setView={setView} logout={logout} />
       {error && <p style={{ color: 'red' }}>{error}</p>}
       {view === 'dashboard' && <Dashboard />}
-      {view === 'apartments' && <ApartmentsList apartments={apartments} />}
-      {view === 'orders' && <OrdersList orders={orders} />}
-      {view === 'clients' && <ClientsList clients={clients} />}
-      {view === 'statistics' && <StatisticsDisplay stats={stats} />}
+      {view === 'apartments' && <MainPage />}
+      {view === 'orders' && (
+        <OrdersList token={token} onBack={() => setView('dashboard')} />
+      )}
+      {view === 'clients' && (
+        <ClientsList token={token} onBack={() => setView('dashboard')} />
+      )}
+      {view === 'statistics' && <StatisticsDisplay />}
       {view === 'documents' && <Documents />}
       {view === 'settings' && <Settings />}
       {view === 'schedule' && <Schedule />}
-      {view === 'rentalCalendar' && <RentalCalendar />}
+      {view === 'rentalCalendar' && (
+        <RentalCalendar propertyId={1} onBack={() => setView('apartments')} />
+      )}
       {view === 'reviewsAndDeals' && <ReviewsAndDeals />}
       {view === 'call' && <Call />}
       {view === 'channelControl' && <ChannelControl />}
@@ -159,76 +95,29 @@ function App() {
 }
 
 // --- Navigation Component ---
-const Navigation = ({ setView, logout }) => {
-  return (
-    <nav style={{ marginBottom: '20px' }}>
-      <button onClick={() => setView('dashboard')}>Dashboard</button>{' '}
-      <button onClick={() => setView('documents')}>📂 Документи</button>{' '}
-      <button onClick={() => setView('settings')}>🔧 Налаштування</button>{' '}
-      <button onClick={() => setView('schedule')}>⏰ Розклад</button>{' '}
-      <button onClick={() => setView('rentalCalendar')}>📅 Календар оренди</button>{' '}
-      <button onClick={() => setView('reviewsAndDeals')}>📅 Відгуки та угоди</button>{' '}
-      <button onClick={() => setView('call')}>📞 Дзвінок</button>{' '}
-      <button onClick={() => setView('channelControl')}>Channel Control</button>{' '}
-      <button onClick={() => setView('apartments')}>Apartments</button>{' '}
-      <button onClick={() => setView('orders')}>Orders</button>{' '}
-      <button onClick={() => setView('clients')}>Clients</button>{' '}
-      <button onClick={() => setView('statistics')}>Statistics</button>{' '}
-      <button onClick={logout}>Logout</button>
-      <hr />
-    </nav>
-  );
-};
+const Navigation = ({ setView, logout }) => (
+  <nav style={{ marginBottom: '20px' }}>
+    <button onClick={() => setView('dashboard')}>Dashboard</button>{' '}
+    <button onClick={() => setView('documents')}>Documents</button>{' '}
+    <button onClick={() => setView('settings')}>Settings</button>{' '}
+    <button onClick={() => setView('schedule')}>Schedule</button>{' '}
+    <button onClick={() => setView('rentalCalendar')}>Rental Calendar</button>{' '}
+    <button onClick={() => setView('reviewsAndDeals')}>Reviews & Deals</button>{' '}
+    <button onClick={() => setView('call')}>Call</button>{' '}
+    <button onClick={() => setView('channelControl')}>Channel Control</button>{' '}
+    <button onClick={() => setView('apartments')}>Apartments</button>{' '}
+    <button onClick={() => setView('orders')}>Orders</button>{' '}
+    <button onClick={() => setView('clients')}>Clients</button>{' '}
+    <button onClick={() => setView('statistics')}>Statistics</button>{' '}
+    <button onClick={logout}>Logout</button>
+    <hr />
+  </nav>
+);
 
-
-// --- Dashboard Component ---
 const Dashboard = () => (
   <div>
     <h3>Welcome!</h3>
     <p>Select an option from the navigation above.</p>
-  </div>
-);
-
-// --- Apartments List Component ---
-const ApartmentsList = ({ apartments }) => (
-  <div className="App">
-  <MainPage />
-</div>
-);
-
-// --- Orders List Component ---
-const OrdersList = ({ orders }) => (
-  <div>
-    <h3>Orders</h3>
-    {orders && orders.length > 0 ? (
-      <ul>
-        {orders.map((order) => (
-          <li key={order.id}>
-            Order ID: {order.id}, Name: {order.name}, Status: {order.ed_status}
-          </li>
-        ))}
-      </ul>
-    ) : (
-      <p>No orders found.</p>
-    )}
-  </div>
-);
-
-// --- Clients List Component ---
-const ClientsList = ({ clients }) => (
-  <div>
-    <h3>Clients (Active Orders)</h3>
-    {clients && clients.length > 0 ? (
-      <ul>
-        {clients.map((client) => (
-          <li key={client.id}>
-            {client.name} — {client.phone}
-          </li>
-        ))}
-      </ul>
-    ) : (
-      <p>No clients found.</p>
-    )}
   </div>
 );
 
@@ -239,7 +128,6 @@ const StatisticsDisplay = ({ stats }) => (
     {stats ? (
       <div>
         <p>Profit: {stats.profit}</p>
-        {/* Additional stats can be shown here */}
       </div>
     ) : (
       <p>No statistics available.</p>
@@ -250,7 +138,7 @@ const StatisticsDisplay = ({ stats }) => (
 // --- Documents Component ---
 const Documents = () => (
   <div>
-    <h3>Документи (Documents)</h3>
+    <h3>Documents</h3>
     <p>This is where you would display documents.</p>
   </div>
 );
@@ -258,40 +146,91 @@ const Documents = () => (
 // --- Settings Component ---
 const Settings = () => (
   <div>
-    <h3>Налаштування (Settings)</h3>
+    <h3>Settings</h3>
     <p>This is where settings options would be available.</p>
   </div>
 );
 
 // --- Schedule Component ---
 const Schedule = () => (
-  <div>
-    <h3>Розклад (Schedule)</h3>
+  <div className="card">
+    <h3>Schedule</h3>
     <p>This is where you can manage scheduling (reviews, signings, appointments).</p>
-  </div>
-);
-
-// --- Rental Calendar Component ---
-const RentalCalendar = () => (
-  <div>
-    <h3>Календар оренди (Rental Calendar)</h3>
-    <p>This view would show available and busy rental days.</p>
+    <form>
+      <div>
+        <label>Date and Time:</label>
+        <input type="datetime-local" />
+      </div>
+      <div>
+        <label>Location:</label>
+        <input type="text" placeholder="Enter location" />
+      </div>
+      <div>
+        <label>Event Type:</label>
+        <select>
+          <option value="review">Review</option>
+          <option value="signing">Signing</option>
+          <option value="appointment">Appointment</option>
+        </select>
+      </div>
+      <div>
+        <label>Notes:</label>
+        <textarea placeholder="Enter notes" />
+      </div>
+      <button type="submit" className="advanced">Schedule</button>
+    </form>
   </div>
 );
 
 // --- Reviews and Deals Component ---
 const ReviewsAndDeals = () => (
-  <div>
-    <h3>Відгуки та угоди (Reviews and Deals)</h3>
+  <div className="card">
+    <h3>Reviews and Deals</h3>
     <p>This view would list reviews and deals with options to update them.</p>
+    <table className="reviews-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Review</th>
+          <th>Deal Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>101</td>
+          <td>Great property!</td>
+          <td>Completed</td>
+          <td>
+            <button>Edit</button>
+            <button>Delete</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 );
 
 // --- Call Component ---
 const Call = () => (
-  <div>
-    <h3>Дзвінок (Call)</h3>
+  <div className="card">
+    <h3>Call</h3>
     <p>This view would allow you to create and manage call reminders.</p>
+    <form>
+      <div>
+        <label>Order ID:</label>
+        <input type="number" placeholder="Enter order id" />
+      </div>
+      <div>
+        <label>Date & Time:</label>
+        <input type="datetime-local" />
+      </div>
+      <div>
+        <label>Note:</label>
+        <textarea placeholder="Enter note" />
+      </div>
+      <button type="submit" className="advanced">Set Reminder</button>
+    </form>
   </div>
 );
 

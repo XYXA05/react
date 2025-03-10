@@ -6,7 +6,9 @@ export const getVerificationAds = async () => {
   const response = await fetch(`${BASE_URL}/admin/verification_ads`);
   return response.json();
 };
-
+export const getUniqueValues = (data, key) => {
+  return [...new Set(data.map(item => item[key]))];
+};
 export const addTrapWord = async (word) => {
   const response = await fetch(`${BASE_URL}/admin/add_trap/`, {
     method: 'POST',
