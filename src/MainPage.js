@@ -1,7 +1,7 @@
 // src/MainPage.js
 import React, { useState, useEffect } from 'react';
 import * as ApartmentService from './ApartmentService';
-import RentalCalendar from './RentalCalendar'; // Make sure you have this component
+import RentalCalendar from './RentalCalendar'; // Ensure this component exists
 import Navigation from './Navigation';
 
 const MainPage = () => {
@@ -9,7 +9,6 @@ const MainPage = () => {
   const [userRole, setUserRole] = useState("admin");
   // Maintain a view state for internal view switching.
   const [view, setView] = useState("dashboard");
-
   // State for selected property (to show its calendar)
   const [selectedProperty, setSelectedProperty] = useState(null);
 
@@ -34,7 +33,7 @@ const MainPage = () => {
   const [owner, setOwner] = useState('');
   const [rooms, setRooms] = useState('');
   const UAH_TO_USD_RATE = 41.5;
-  // Added missing state variables for filter options:
+  // Filter options
   const [typeDealOptions, setTypeDealOptions] = useState([]);
   const [typeObjectOptions, setTypeObjectOptions] = useState([]);
   const [ownerOptions, setOwnerOptions] = useState([]);
@@ -43,15 +42,38 @@ const MainPage = () => {
   const [verificationApartments, setVerificationApartments] = useState([]);
   const [newTrapWord, setNewTrapWord] = useState('');
   const [newStopWord, setNewStopWord] = useState('');
-
-  // State for free days filter (for calendar search)
+  // Free days filter (for calendar search)
   const [freeFrom, setFreeFrom] = useState('');
   const [freeTo, setFreeTo] = useState('');
+
+  // Define status options similar to Angular code
+  const statusOptions = ['new', 'activation_soon', 'inactive', 'successful', 'spam'];
 
   useEffect(() => {
     fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole]);
+
+  // Helper to update a field for an apartment in state
+  const handleChangeField = (apartmentId, field, value) => {
+    setApartments(prevApts =>
+      prevApts.map(apartment =>
+        apartment.id === apartmentId ? { ...apartment, [field]: value } : apartment
+      )
+    );
+  };
+
+  // Handle status change from the select element
+  const onStatusChange = (e, apartmentId) => {
+    const newStatus = e.target.value;
+    ApartmentService.updateApartmentStatus(apartmentId, newStatus)
+      .then(() => {
+        setFilteredApartments(prev =>
+          prev.map(ap => (ap.id === apartmentId ? { ...ap, ad_status: newStatus } : ap))
+        );
+      })
+      .catch(err => console.error('Error updating status:', err));
+  };
 
   const fetchInitialData = async () => {
     try {
@@ -137,7 +159,7 @@ const MainPage = () => {
     return isHryvnia(price) ? cleanPrice / UAH_TO_USD_RATE : cleanPrice;
   };
 
-  // (Other functions such as startParser, stopParser, auto-posting, watermark, etc. remain unchanged.)
+  // Other functions (startParser, stopParser, auto-posting, watermark, etc.)
   const startParser = async () => {
     try {
       await ApartmentService.runParser();
@@ -360,7 +382,6 @@ const MainPage = () => {
     <div className="container admin-panel">
       <h1 className="animated-heading">Dashboard - Apartments</h1>
 
-
       {/* Filters Section */}
       <section className="filters card">
         <h2>Filter Apartments</h2>
@@ -475,8 +496,8 @@ const MainPage = () => {
                 <p>Object: {ad.type_object}</p>
                 <p>Status: {ad.ad_status}</p>
                 <button onClick={() => setSelectedProperty(ad)}>
-                            View Calendar
-                          </button>
+                  View Calendar
+                </button>
                 <button className="advanced">{ad.expanded ? 'Collapse' : 'Expand'}</button>
               </div>
               {ad.expanded && (
@@ -494,10 +515,28 @@ const MainPage = () => {
                             </>
                           )}
                           <button className="advanced" onClick={() => deleteImage(image.id)}>Delete</button>
-                          {/* Fix: use the current ad object instead of "prop" */}
                           <button onClick={() => setSelectedProperty(ad)}>View Calendar</button>
                         </div>
                       ))}
+                  </div>
+                  {/* Apartment Info and Edit Form */}
+                  <div className="apartment-info">
+                    <p>ID: {ad.id}</p>
+                    <p>Deal: {ad.type_deal}</p>
+                    <p>Object: {ad.type_object}</p>
+                    <p>Status: {ad.ad_status}</p>
+                    <label htmlFor={`statusSelect_${ad.id}`}>Update Status:</label>
+                    <select
+                      id={`statusSelect_${ad.id}`}
+                      value={ad.ad_status}
+                      onChange={(e) => onStatusChange(e, ad.id)}
+                    >
+                      {statusOptions.map((status, idx) => (
+                        <option key={idx} value={status}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <form onSubmit={(e) => {
                     e.preventDefault();
@@ -514,20 +553,164 @@ const MainPage = () => {
                       superficiality_fix: ad.superficiality_fix,
                       classs_fix: ad.classs_fix,
                       url_fix: ad.url_fix,
+                      on_map_fix: ad.on_map_fix,
                       user_fix: ad.user_fix,
                       phone_fix: ad.phone_fix,
+                      id_olx_fix: ad.id_olx_fix,
+                      comment_fix: ad.comment_fix,
                     };
                     updateFixFields(ad.id, updateData);
                   }}>
                     <div className="apartment-info">
+                      <p>{ad.title}</p>
                       <label>Title (Fixed):</label>
                       <input
                         type="text"
                         value={ad.title_fix || ''}
-                        onChange={(e) => {
-                          ad.title_fix = e.target.value;
-                          setApartments([...apartments]);
-                        }}
+                        onChange={(e) => handleChangeField(ad.id, 'title_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.price}</p>
+                      <label>Price (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.price_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'price_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.location_date}</p>
+                      <label>Location Date (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.location_date_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'location_date_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.features}</p>
+                      <label>Features (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.features_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'features_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.owner}</p>
+                      <label>Owner (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.owner_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'owner_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.square}</p>
+                      <label>Square (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.square_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'square_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.rooms}</p>
+                      <label>Room (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.room_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'room_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.residential_complex}</p>
+                      <label>Residential Complex (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.residential_complex_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'residential_complex_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.floor}</p>
+                      <label>Floor (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.floor_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'floor_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.superficiality}</p>
+                      <label>Superficiality (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.superficiality_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'superficiality_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.classs}</p>
+                      <label>Class (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.classs_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'classs_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.url}</p>
+                      <label>URL (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.url_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'url_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <label>On Map (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.on_map_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'on_map_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.user}</p>
+                      <label>User (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.user_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'user_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.phone}</p>
+                      <label>Phone (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.phone_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'phone_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.id_olx}</p>
+                      <label>OLX ID (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.id_olx_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'id_olx_fix', e.target.value)}
+                        className="animated"
+                      />
+
+                      <p>{ad.comment}</p>
+                      <label>Comment (Fixed):</label>
+                      <input
+                        type="text"
+                        value={ad.comment_fix || ''}
+                        onChange={(e) => handleChangeField(ad.id, 'comment_fix', e.target.value)}
                         className="animated"
                       />
                     </div>
