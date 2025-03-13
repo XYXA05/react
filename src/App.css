@@ -468,3 +468,82 @@ footer.advanced {
 .image-gallery{
   display: flex;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.container {
+  padding: 20px;
+}
+
+.animated-heading {
+  font-size: 1.5em;
+  margin-bottom: 15px;
+}
+
+.channel-item {
+  transition: transform 0.2s;
+  margin-bottom: 5px;
+}
+
+.channel-item:hover {
+  transform: rotate(-2deg);
+}
+
+/* Modal styling */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 20px;
+  border-radius: 5px;
+  max-width: 500px;
+  width: 100%;
+}
+
+/* Template hint styling */
+.template-hint {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-top: 10px;
+  background-color: #f9f9f9;
+}
+
+.template-hint h5 {
+  margin-top: 0;
+}

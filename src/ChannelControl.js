@@ -13,9 +13,9 @@ const ChannelControl = () => {
   const [showChannelModal, setShowChannelModal] = useState(false);
 
   // Dropdown arrays – adjust as needed
-  const categories = ['-', 'good', 'bad', 'owner', 'sent to telegram channel', 'successful'];
-  const typeDeals = ['-', 'kvartiry', 'doma', 'posutochno-pochasovo'];
-  const typeObjects = ['-', 'prodazha-kvartir', 'prodazha-domov', 'dolgosrochnaya-arenda-kvartir', 'posutochno-pochasovo-kvartiry'];
+  const categories = ['good', 'bad', 'owner', 'sent to telegram channel', 'successful'];
+  const typeDeals = ['kvartiry', 'doma', 'posutochno-pochasovo'];
+  const typeObjects = ['prodazha-kvartir', 'prodazha-domov', 'dolgosrochnaya-arenda-kvartir', 'posutochno-pochasovo-kvartiry'];
 
   const apiUrl = 'http://127.0.0.1:8000';
 
@@ -24,7 +24,6 @@ const ChannelControl = () => {
     getTemplates();
   }, []);
 
-  // Get all channels from backend
   const getChannels = async () => {
     try {
       const res = await fetch(`${apiUrl}/telegram_channels`);
@@ -36,7 +35,6 @@ const ChannelControl = () => {
     }
   };
 
-  // Get all templates from backend
   const getTemplates = async () => {
     try {
       const res = await fetch(`${apiUrl}/templates`);
@@ -49,8 +47,6 @@ const ChannelControl = () => {
 
   // ---- Channel Functions ----
 
-  // Open channel modal for adding or editing.
-  // If channel parameter is null, we set an empty default.
   const openChannelModal = (channel) => {
     if (channel) {
       setEditingChannel({ ...channel });
@@ -64,11 +60,9 @@ const ChannelControl = () => {
     setShowChannelModal(false);
   };
 
-  // Save channel: if editingChannel.id exists, we update; otherwise, we add a new channel.
   const saveChannel = async () => {
     try {
       if (editingChannel.id) {
-        // Update existing channel via PUT
         const res = await fetch(`${apiUrl}/telegram_channels/${editingChannel.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -83,7 +77,6 @@ const ChannelControl = () => {
           alert("Error updating channel: " + JSON.stringify(errorData));
         }
       } else {
-        // Add new channel via POST
         const res = await fetch(`${apiUrl}/telegram_channels`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -251,7 +244,36 @@ const ChannelControl = () => {
             </div>
             <div>
               <label>Template Text:</label>
-              <textarea value={selectedTemplate.templateText} onChange={(e) => setSelectedTemplate({ ...selectedTemplate, templateText: e.target.value })}></textarea>
+              <textarea 
+                value={selectedTemplate.templateText} 
+                onChange={(e) => setSelectedTemplate({ ...selectedTemplate, templateText: e.target.value })}
+              ></textarea>
+            </div>
+            {/* Hint Block for Placeholders */}
+            <div className="template-hint">
+              <h5>Hint: Available Placeholders</h5>
+              <ul>
+                <li><code>{'{id}'}</code> - айді оголошення</li>
+                <li><code>{'{title}'}</code> - тайтл оголошення</li>
+                <li><code>{'{price}'}</code> - ціна</li>
+                <li><code>{'{location_date}'}</code> - адрес (місто район)</li>
+                <li><code>{'{description}'}</code> - опис оголошення від першоначального джерела</li>
+                <li><code>{'{features}'}</code> - вивід всіх особливостей оголошення</li>
+                <li><code>{'{owner}'}</code> - бізнес чи власник</li>
+                <li><code>{'{square}'}</code> - кількість квадратних метрів</li>
+                <li><code>{'{room}'}</code> - кількість кімнат</li>
+                <li><code>{'{residential_complex}'}</code> - ЖК</li>
+                <li><code>{'{floor}'}</code> - етаж</li>
+                <li><code>{'{superficiality}'}</code> - поверховість</li>
+                <li><code>{'{classs}'}</code> - клас життя</li>
+                <li><code>{'{url}'}</code> - URL</li>
+                <li><code>{'{on_map}'}</code> - на карті</li>
+                <li><code>{'{user}'}</code> - імʼя клієнта</li>
+                <li><code>{'{phone}'}</code> - номер телефону клієнта</li>
+                <li><code>{'{id_olx}'}</code> - ід самого ресурсу</li>
+                <li><code>[імʼя силки вводимо тут](http://www.example.com/)</code></li>
+                <li><code>{'{price_per_sq}'}</code> - ціна за метр кВ</li>
+              </ul>
             </div>
             <div className="template-preview">
               <h4>Template Preview:</h4>
