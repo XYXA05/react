@@ -9,6 +9,7 @@ import RentalCalendar from './RentalCalendar'; // Calendar view component
 import OrdersList from './OrdersList'; // Orders view (separate component)
 import ClientsList from './ClientsList'; // Clients view (separate component)
 import CreateUser from './CreateUser';
+import ActionLogsMonitoring from './ActionLogsMonitoring';
 const API_URL = 'http://localhost:8000'; // Adjust to your backend URL
 
 function App() {
@@ -91,6 +92,7 @@ function App() {
       {view === 'call' && <Call />}
       {view === 'channelControl' && <ChannelControl />}
       {view === 'create_user' && <CreateUser />}
+      {view === 'logs' && <ActionLogsMonitoring/>}
     </div>
   );
 }
@@ -111,6 +113,7 @@ const Navigation = ({ setView, logout }) => (
     <button onClick={() => setView('clients')}>Clients</button>{' '}
     <button onClick={() => setView('statistics')}>Statistics</button>{' '}
     <button onClick={() => setView('create_user')}>Create User</button>{' '}
+    <button onClick={() => setView('logs')}>Log Users</button>{' '}
     <button onClick={logout}>Logout</button>
     <hr />
   </nav>

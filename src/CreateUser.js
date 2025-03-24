@@ -7,19 +7,21 @@ const CreateUser = () => {
   const [name, setName] = useState('');
   const [userType, setUserType] = useState('realtor');
   const [message, setMessage] = useState('');
+  const [chat_id, setChat_id] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       // Choose endpoint based on userType
       const endpoint = userType === 'realtor' ? 'http://127.0.0.1:8000/register/realtor' : 'http://127.0.0.1:8000/register/team_leader';
-      const payload = { username, password, name };
+      const payload = { username, password, name, chat_id };
       const response = await axios.post(endpoint, payload);
       setMessage(`User ${response.data.username} created successfully!`);
       // Clear form if needed
       setUsername('');
       setPassword('');
       setName('');
+      setChat_id('');
     } catch (error) {
       console.error(error);
       setMessage('Error creating user: ' + error.response?.data.detail || error.message);
@@ -65,6 +67,14 @@ const CreateUser = () => {
                 <option value="realtor">Realtor</option>
                 <option value="team_leader">Team Leader</option>
             </select>
+         </div>
+         <div>
+            <label>Chat_id Tg:</label>
+            <input 
+              type="text" 
+              value={chat_id} 
+              onChange={(e)=>setChat_id(e.target.value)} 
+            />
          </div>
          <button type="submit">Create User</button>
       </form>
