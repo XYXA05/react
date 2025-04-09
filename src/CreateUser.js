@@ -66,6 +66,21 @@ const CreateUser = () => {
             >
                 <option value="realtor">Realtor</option>
                 <option value="team_leader">Team Leader</option>
+
+                <option value="rieltor_media_buyer">Media buyer</option>
+                <option value="rieltor_media_buyer_leader">Media buyer TeamLeader</option>
+
+                <option value="cliner">Cliner</option>
+                <option value="cliner_leader">Clener TeamLeader</option>
+
+                <option value="design">Design</option>
+                <option value="design_leader">Design TeamLeader</option>
+
+                <option value="store">Store</option>
+                <option value="store_leader">Store TeamLeader</option>
+
+                <option value="repair_construction">Repair/Construction</option>
+                <option value="repair_construction_leader">Repair/Construction TeamLeader</option>
             </select>
          </div>
          <div>
