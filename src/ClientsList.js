@@ -1,25 +1,45 @@
-// ClientsList.js
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
 const API_URL = 'http://localhost:8000';
 
-const ClientsList = ({ token, onBack }) => {
+// Helper: return the proper endpoint based on client category
+const getEndpoint = (category) => {
+  switch (category) {
+    case 'Клінінг':
+      return `${API_URL}/cleaning/clients/`;
+    case 'Ремонт/Будівництво':
+      return `${API_URL}/renovation/clients/`;
+    case 'Дизайн':
+      return `${API_URL}/design/clients/`;
+    case 'Інтернет-магазин':
+      return `${API_URL}/store/clients/`;
+    default:
+      return `${API_URL}/get_orders/`; // fallback route if needed
+  }
+};
+
+const ClientsList = ({ token, onBack, category }) => {
   const [clients, setClients] = useState([]);
   const [error, setError] = useState('');
   const [editingClient, setEditingClient] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', phone: '' });
 
+  // Use the helper to determine the endpoint based on category.
+  const endpoint = getEndpoint(category);
+
   const fetchClients = async () => {
     try {
-      const response = await axios.get(`${API_URL}/get_orders/`, {
+      const response = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // Extract contact info from orders
+      // Filter for orders that have valid name and phone.
+      // (Assumes the response is an array of orders/clients.)
       const activeClients = response.data.filter(
         (order) => order.name && order.phone
       );
+      // Map the relevant fields.
       const clientContacts = activeClients.map((order) => ({
         id: order.id,
         name: order.name,
@@ -35,11 +55,11 @@ const ClientsList = ({ token, onBack }) => {
 
   useEffect(() => {
     fetchClients();
-  }, []);
+  }, [endpoint]); // re-fetch if endpoint changes
 
   const handleDelete = async (clientId) => {
     try {
-      await axios.delete(`${API_URL}/orders/${clientId}`, {
+      await axios.delete(`${endpoint}${clientId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       fetchClients();
@@ -55,7 +75,7 @@ const ClientsList = ({ token, onBack }) => {
 
   const handleSaveEdit = async () => {
     try {
-      await axios.put(`${API_URL}/orders/${editingClient.id}`, editingClient, {
+      await axios.put(`${endpoint}${editingClient.id}`, editingClient, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setEditingClient(null);
@@ -69,7 +89,7 @@ const ClientsList = ({ token, onBack }) => {
   const handleAddClient = async (e) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/orders/`, newClient, {
+      await axios.post(endpoint, newClient, {
         headers: { Authorization: `Bearer ${token}` },
       });
       setNewClient({ name: '', phone: '' });
@@ -83,7 +103,7 @@ const ClientsList = ({ token, onBack }) => {
 
   return (
     <div className="clients-list">
-      <h3>Client Contacts</h3>
+      <h3>Client Contacts ({category})</h3>
       {error && <p style={{ color: 'red' }}>{error}</p>}
       <button onClick={() => setShowAddForm(!showAddForm)}>
         {showAddForm ? 'Hide Add Form' : 'Add Client'}

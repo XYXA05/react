@@ -3,25 +3,53 @@ import axios from 'axios';
 import './CalendarView.css';
 import { BASE_URL } from './ApartmentService';
 
-const RentalCalendar = ({ propertyId, onBack }) => {
+/**
+ * RentalCalendar accepts the following props:
+ *  - propertyId: the record's ID for which the calendar is displayed.
+ *  - category: a string indicating which calendar endpoint to use.
+ *      For example:
+ *         "Дизайн"             => calls `${BASE_URL}/design/calendar/{propertyId}/{year}/{month}`
+ *         "Ремонт/Будівництво" => calls `${BASE_URL}/renovation/calendar/{propertyId}/{year}/{month}`
+ *         "Клінінг"            => calls `${BASE_URL}/cleaning/calendar/{propertyId}/{year}/{month}`
+ *         "Інтернет-магазин"   => calls `${BASE_URL}/store_calendar/{propertyId}/{year}/{month}`
+ *  - onBack: a callback function that returns to the previous view.
+ */
+const RentalCalendar = ({ propertyId, category, onBack }) => {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [calendarData, setCalendarData] = useState(null);
   const [error, setError] = useState('');
   
-  // Free days filter fields
+  // States for free days filter inputs.
   const [freeFrom, setFreeFrom] = useState('');
   const [freeTo, setFreeTo] = useState('');
 
+  // Build the proper endpoint based on the category passed.
+  const getEndpoint = () => {
+    switch (category) {
+      case 'Дизайн':
+        return `${BASE_URL}/design/calendar/${propertyId}/${year}/${month}`;
+      case 'Ремонт/Будівництво':
+        return `${BASE_URL}/renovation/calendar/${propertyId}/${year}/${month}`;
+      case 'Клінінг':
+        return `${BASE_URL}/cleaning/calendar/${propertyId}/${year}/${month}`;
+      case 'Інтернет-магазин':
+        return `${BASE_URL}/store_calendar/${propertyId}/${year}/${month}`;
+      default:
+        return `${BASE_URL}/calendar/${propertyId}/${year}/${month}`;
+    }
+  };
+
+  // Fetch calendar data from the backend.
   const fetchCalendar = async () => {
     if (!propertyId) return;
     try {
       const params = {};
       if (freeFrom) params.freeFrom = freeFrom;
       if (freeTo) params.freeTo = freeTo;
-      
-      const res = await axios.get(`${BASE_URL}/calendar/${propertyId}/${year}/${month}`, { params });
+      const endpoint = getEndpoint();
+      const res = await axios.get(endpoint, { params });
       setCalendarData(res.data);
       setError('');
     } catch (err) {
@@ -32,8 +60,9 @@ const RentalCalendar = ({ propertyId, onBack }) => {
 
   useEffect(() => {
     fetchCalendar();
-  }, [propertyId, year, month, freeFrom, freeTo]);
+  }, [propertyId, year, month, freeFrom, freeTo, category]);
 
+  // Handlers for month navigation.
   const goToPrevMonth = () => {
     if (calendarData?.navigation?.prev) {
       setYear(calendarData.navigation.prev.year);
@@ -48,6 +77,7 @@ const RentalCalendar = ({ propertyId, onBack }) => {
     }
   };
 
+  // Handlers to add or remove busy days.
   const addBusyDay = async (day) => {
     try {
       await axios.post(`${BASE_URL}/busy_day/${propertyId}`, { day, month, year });
@@ -77,7 +107,7 @@ const RentalCalendar = ({ propertyId, onBack }) => {
     <div className="calendar-view">
       <button onClick={onBack} className="back-button">← Back to Properties List</button>
       <h3>
-        Calendar for Property {propertyId} – {calendarData?.apartment?.title || ''}
+        Calendar for {category} (ID: {propertyId}) – {calendarData?.apartment?.title || ''}
       </h3>
       {error && <p className="error">{error}</p>}
       <form onSubmit={handleSearch} className="calendar-search">

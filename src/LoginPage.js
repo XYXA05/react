@@ -5,13 +5,11 @@ function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
   const API_URL = 'http://localhost:8000';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Adjust the request as needed (this assumes a JSON body; your API might differ)
       const response = await axios.post(`${API_URL}/login`, { username, password });
       const token = response.data.access_token;
       onLogin(token);
@@ -24,14 +22,14 @@ function Login({ onLogin }) {
   return (
     <div>
       <h2>Login</h2>
-      { error && <p style={{ color: 'red' }}>{error}</p> }
+      {error && <p style={{ color: 'red' }}>{error}</p>}
       <form onSubmit={handleSubmit}>
         <div>
           <input 
             type="text" 
             placeholder="Username" 
             value={username}
-            onChange={e => setUsername(e.target.value)}
+            onChange={(e) => setUsername(e.target.value)}
             required 
           />
         </div>
@@ -40,7 +38,7 @@ function Login({ onLogin }) {
             type="password" 
             placeholder="Password" 
             value={password}
-            onChange={e => setPassword(e.target.value)}
+            onChange={(e) => setPassword(e.target.value)}
             required 
           />
         </div>
@@ -51,3 +49,4 @@ function Login({ onLogin }) {
 }
 
 export default Login;
+
