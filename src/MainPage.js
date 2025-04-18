@@ -3,6 +3,9 @@ import React, { useState, useEffect } from 'react';
 import * as ApartmentService from './ApartmentService';
 import RentalCalendar from './RentalCalendar'; // Ensure this component exists
 import Navigation from './Navigation';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import html2canvas from 'html2canvas';
+
 
 const MainPage = () => {
   // For demonstration we hard-code the user role.
@@ -62,6 +65,132 @@ const MainPage = () => {
       )
     );
   };
+  const reorder = (list, startIndex, endIndex) => {
+    const result = Array.from(list);
+    const [removed] = result.splice(startIndex, 1);
+    result.splice(endIndex, 0, removed);
+    return result;
+  };
+    // Drag & Drop handler
+    const handleDragEnd = (result) => {
+      const { source, destination } = result;
+      if (!destination) return;
+      const aptId = parseInt(source.droppableId.split('-')[1], 10);
+      setApartments(prev => prev.map(ap => {
+        if (ap.id !== aptId) return ap;
+        return { ...ap, files: reorder(ap.files, source.index, destination.index) };
+      }));
+    };
+// Poster generation (fixed container sizing + off‑screen placement)
+// Make a slick poster just like your example
+const makePoster = async (ad) => {
+  // 1) Build container
+  const container = document.createElement('div');
+  Object.assign(container.style, {
+    width: '1080px',
+    margin: '0 auto',
+    background: '#1f3a1f',      // dark-green
+    display: 'flex',
+    flexDirection: 'column',
+    color: 'white',
+    fontFamily: 'sans-serif',
+  });
+
+  // 2) Top hero image (first file)
+  const hero = new Image();
+  hero.crossOrigin = 'anonymous';
+  hero.src = ad.files[0]?.file_path || '';
+  Object.assign(hero.style, {
+    width: '100%',
+    height: 'auto',
+    objectFit: 'cover',
+  });
+  await new Promise(r => (hero.onload = r)); 
+  container.appendChild(hero);
+
+  // 3) Title + Price strip
+  const strip = document.createElement('div');
+  Object.assign(strip.style, {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '20px',
+    fontSize: '48px',
+    fontWeight: 'bold',
+  });
+  const title = document.createElement('div');
+  title.innerText = 'ОРЕНДА';
+  const price = document.createElement('div');
+  // you could store USD separately, or parse from ad.price
+  const num = parseFloat(ad.price.replace(/[^\d.]/g, '')) || '';
+  price.innerText = `$${num}`;
+  strip.append(title, price);
+  container.appendChild(strip);
+
+  // 4) Two columns of details
+  const details = document.createElement('div');
+  Object.assign(details.style, {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '0 20px 20px',
+    fontSize: '24px',
+    lineHeight: '1.2',
+  });
+
+  // left column
+  const leftCol = document.createElement('div');
+  leftCol.innerHTML = `
+    <div>🏠 1 КІМ. КВАРТИРА</div>
+    <div>📍 ${ad.location_date.split(', ')[1] || ''}</div>
+  `;
+  // right column
+  const rightCol = document.createElement('div');
+  rightCol.innerHTML = `
+    <div>🏢 ${ad.residential_complex || ''}</div>
+    <div>🆔 КОД ${ad.id}</div>
+  `;
+
+  details.append(leftCol, rightCol);
+  container.appendChild(details);
+
+  // 5) Thumbnail rail (up to 3)
+  const thumbs = document.createElement('div');
+  Object.assign(thumbs.style, {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '10px',
+    padding: '0 20px 20px',
+  });
+
+  // only show at most 3
+  await Promise.all(
+    ad.files.slice(0, 3).map(img => new Promise((res) => {
+      const el = new Image();
+      el.crossOrigin = 'anonymous';
+      el.src = img.file_path;
+      Object.assign(el.style, {
+        width: 'calc((100% - 20px)/3)',
+        height: 'auto',
+        objectFit: 'cover',
+      });
+      el.onload = () => { thumbs.appendChild(el); res(); };
+      el.onerror = () => res();
+    }))
+  );
+  container.appendChild(thumbs);
+
+  // 6) Snapshot & download
+  document.body.appendChild(container);
+  const canvas = await html2canvas(container, { useCORS: true });
+  const link = document.createElement('a');
+  link.download = `poster-${ad.id}.png`;
+  link.href     = canvas.toDataURL('image/png');
+  link.click();
+  document.body.removeChild(container);
+};
+
+
+
 
   // Handle status change from the select element
   const onStatusChange = (e, apartmentId) => {
@@ -379,6 +508,8 @@ const MainPage = () => {
   }
 
   return (
+    <DragDropContext onDragEnd={handleDragEnd}>
+
     <div className="container admin-panel">
       <h1 className="animated-heading">Dashboard - Apartments</h1>
 
@@ -503,22 +634,26 @@ const MainPage = () => {
               {ad.expanded && (
                 <div className="apartment-details">
                   <input type="file" multiple onChange={(e) => uploadImages(e, ad.id)} className="animated" />
-                  <div className="image-gallery">
-                    {ad.files &&
-                      ad.files.map(image => (
-                        <div key={image.id}>
-                          <img src={image.file_path} alt={ad.title} className="gallery-image" />
-                          {(userRole === "admin" || userRole === "team_leader") && (
-                            <>
-                              <button className="advanced" onClick={() => applyWatermark(image.id, ad.id)}>Apply Watermark</button>
-                              <button className="advanced" onClick={() => removeWatermarkAI(image.id, ad.id)}>Remove Watermark (AI)</button>
-                            </>
-                          )}
-                          <button className="advanced" onClick={() => deleteImage(image.id)}>Delete</button>
-                          <button onClick={() => setSelectedProperty(ad)}>View Calendar</button>
-                        </div>
-                      ))}
-                  </div>
+                  <button onClick={()=>makePoster(ad)}>Make Poster</button>
+                  <Droppable droppableId={`gallery-${ad.id}`} direction="horizontal" isDropDisabled={false}>
+                    {provided => (
+                      <div className="image-gallery" ref={provided.innerRef} {...provided.droppableProps}>
+                        {ad.files.map((img,i)=>(
+                          <Draggable key={img.id} draggableId={`${img.id}`} index={i}>
+                            {(prov,snap)=>(
+                              <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} className={snap.isDragging?'dragging':''}>
+                                <img src={new URL(img.file_path).pathname} alt={ad.title} />
+                                <button onClick={()=>applyWatermark(img.id,ad.id)}>Watermark</button>
+                                <button onClick={()=>removeWatermarkAI(img.id,ad.id)}>Remove AI</button>
+                                <button onClick={()=>deleteImage(img.id)}>Delete</button>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
                   {/* Apartment Info and Edit Form */}
                   <div className="apartment-info">
                     <p>ID: {ad.id}</p>
@@ -784,7 +919,8 @@ const MainPage = () => {
         </section>
       )}
     </div>
+    </DragDropContext>
+
   );
 };
-
 export default MainPage;

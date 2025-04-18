@@ -17,7 +17,8 @@ import StoreAdmin from './StoreAdmin';              // For Internet Store
 import DesignProjects from './DesignProjectsControl'; // For Design projects
 import RenovationProjects from './RenovationProjectsControl'; // For Renovation projects
 import CleaningOrders from './CleaningControl';       // For Cleaning orders
-
+import AdminRolesPanel from './AdminRolesPanel';
+import AdminOrdersPanel     from './AdminOrdersPanel';
 const API_URL = 'http://localhost:8000'; // Replace with your backend URL
 
 function App() {
@@ -110,7 +111,12 @@ function App() {
       {view === 'channelControl' && <ChannelControl />}
       {view === 'create_user' && <CreateUser />}
       {view === 'logs' && <ActionLogsMonitoring />}
-
+      {view === 'adminApartments' && (
+  <AdminRolesPanel token={token} onBack={() => setView('dashboard')} />
+)}
+{view === 'adminOrders' && (
+  <AdminOrdersPanel     token={token} onBack={() => setView('dashboard')} />
+)}
       {/* Admin Panels:
             Design: role is admin OR design OR design_leader
             Renovation: role is admin OR repair_construction OR repair_construction_leader
@@ -201,6 +207,12 @@ const Navigation = ({ setView, logout, role, token }) => {
           <button onClick={() => setView('adminCleaning')}>
             Адмінка для Клінінгу 🧹
           </button>
+          <button onClick={() => setView('adminApartments')}>
+        Admin Apartments
+      </button>
+      <button onClick={() => setView('adminOrders')}>
+        Admin Orders
+      </button>
         </>
       );
     }
