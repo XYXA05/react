@@ -81,113 +81,64 @@ const MainPage = () => {
         return { ...ap, files: reorder(ap.files, source.index, destination.index) };
       }));
     };
-// Poster generation (fixed container sizing + off‑screen placement)
-// Make a slick poster just like your example
-const makePoster = async (ad) => {
-  // 1) Build container
+ // Poster generation: hero + details + 5×2 grid
+ const makePoster = async ad => {
   const container = document.createElement('div');
   Object.assign(container.style, {
-    width: '1080px',
-    margin: '0 auto',
-    background: '#1f3a1f',      // dark-green
-    display: 'flex',
-    flexDirection: 'column',
-    color: 'white',
-    fontFamily: 'sans-serif',
+    width: '1080px', margin: '0 auto', background: '#1f3a1f',
+    display: 'flex', flexDirection: 'column', color:'white', fontFamily:'sans-serif'
   });
 
-  // 2) Top hero image (first file)
-  const hero = new Image();
-  hero.crossOrigin = 'anonymous';
+  // Hero image
+  const hero = new Image(); hero.crossOrigin='anonymous';
   hero.src = ad.files[0]?.file_path || '';
-  Object.assign(hero.style, {
-    width: '100%',
-    height: 'auto',
-    objectFit: 'cover',
-  });
-  await new Promise(r => (hero.onload = r)); 
+  Object.assign(hero.style, { width:'100%', height:'400px', objectFit:'cover' });
+  await new Promise(r => hero.onload=r);
   container.appendChild(hero);
 
-  // 3) Title + Price strip
+  // Title+Price
   const strip = document.createElement('div');
   Object.assign(strip.style, {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '20px',
-    fontSize: '48px',
-    fontWeight: 'bold',
+    display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px',
+    fontSize:'48px', fontWeight:'bold', textTransform:'uppercase'
   });
-  const title = document.createElement('div');
-  title.innerText = 'ОРЕНДА';
-  const price = document.createElement('div');
-  // you could store USD separately, or parse from ad.price
-  const num = parseFloat(ad.price.replace(/[^\d.]/g, '')) || '';
-  price.innerText = `$${num}`;
-  strip.append(title, price);
+  const t = document.createElement('div'); t.innerText='ОРЕНДА';
+  const p = document.createElement('div');
+  p.innerText = `$${parseFloat(ad.price.replace(/[^\d.]/g,''))||''}`;
+  strip.append(t,p);
   container.appendChild(strip);
 
-  // 4) Two columns of details
-  const details = document.createElement('div');
-  Object.assign(details.style, {
-    display: 'flex',
-    justifyContent: 'space-between',
-    padding: '0 20px 20px',
-    fontSize: '24px',
-    lineHeight: '1.2',
-  });
-
-  // left column
-  const leftCol = document.createElement('div');
-  leftCol.innerHTML = `
+  // Details
+  const det = document.createElement('div');
+  Object.assign(det.style, { display:'flex', justifyContent:'space-between', padding:'0 20px 20px', fontSize:'24px', lineHeight:'1.2' });
+  det.innerHTML = `
     <div>🏠 1 КІМ. КВАРТИРА</div>
-    <div>📍 ${ad.location_date.split(', ')[1] || ''}</div>
-  `;
-  // right column
-  const rightCol = document.createElement('div');
-  rightCol.innerHTML = `
-    <div>🏢 ${ad.residential_complex || ''}</div>
+    <div>🏢 ${ad.room||''}</div>
+    <div>📍 ${ad.location_date||''}</div>
     <div>🆔 КОД ${ad.id}</div>
   `;
+  container.appendChild(det);
 
-  details.append(leftCol, rightCol);
-  container.appendChild(details);
-
-  // 5) Thumbnail rail (up to 3)
-  const thumbs = document.createElement('div');
-  Object.assign(thumbs.style, {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '10px',
-    padding: '0 20px 20px',
+  // 5×2 grid
+  const grid = document.createElement('div');
+  Object.assign(grid.style, {
+    display:'grid', gridTemplateColumns:'repeat(5,1fr)', gridTemplateRows:'repeat(2,200px)', gap:'10px', padding:'0 20px 20px'
   });
+  await Promise.all(ad.files.slice(0,10).map(img=>new Promise(res=>{
+    const el=new Image(); el.crossOrigin='anonymous'; el.src=img.file_path;
+    Object.assign(el.style,{width:'100%',height:'100%',objectFit:'cover'});
+    el.onload=()=>{grid.appendChild(el);res();}; el.onerror=res;
+  })));
+  container.appendChild(grid);
 
-  // only show at most 3
-  await Promise.all(
-    ad.files.slice(0, 3).map(img => new Promise((res) => {
-      const el = new Image();
-      el.crossOrigin = 'anonymous';
-      el.src = img.file_path;
-      Object.assign(el.style, {
-        width: 'calc((100% - 20px)/3)',
-        height: 'auto',
-        objectFit: 'cover',
-      });
-      el.onload = () => { thumbs.appendChild(el); res(); };
-      el.onerror = () => res();
-    }))
-  );
-  container.appendChild(thumbs);
-
-  // 6) Snapshot & download
+  // Snapshot & download
   document.body.appendChild(container);
-  const canvas = await html2canvas(container, { useCORS: true });
-  const link = document.createElement('a');
-  link.download = `poster-${ad.id}.png`;
-  link.href     = canvas.toDataURL('image/png');
-  link.click();
+  const canvas = await html2canvas(container,{useCORS:true});
+  const link=document.createElement('a'); link.download=`poster-${ad.id}.png`;
+  link.href=canvas.toDataURL('image/png'); link.click();
   document.body.removeChild(container);
 };
+
 
 
 
