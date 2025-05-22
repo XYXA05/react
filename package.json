@@ -12,6 +12,7 @@
     "react": "^19.0.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^19.0.0",
+    "react-hook-form": "^7.56.1",
     "react-router-dom": "^7.2.0",
     "react-scripts": "5.0.1",
     "web-vitals": "^2.1.4"
@@ -39,5 +40,11 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.3",
+    "shadcn-ui": "^0.9.5",
+    "tailwindcss": "^4.1.5"
   }
 }

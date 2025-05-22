@@ -1,205 +1,324 @@
-import React, { useState, useEffect } from 'react';
+// src/ClientsAdminPanel.jsx
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import PropTypes from 'prop-types';
 
-const API_URL = 'http://localhost:8000';
 
-// Helper: return the proper endpoint based on client category
+/**
+ * Helper: returns the correct API endpoint based on user category
+ */
 const getEndpoint = (category) => {
   switch (category) {
-    case 'Клінінг':
-      return `${API_URL}/cleaning/clients/`;
-    case 'Ремонт/Будівництво':
-      return `${API_URL}/renovation/clients/`;
-    case 'Дизайн':
-      return `${API_URL}/design/clients/`;
-    case 'Інтернет-магазин':
-      return `${API_URL}/store/clients/`;
-    default:
-      return `${API_URL}/get_orders/`; // fallback route if needed
+    case 'cliner':
+    case 'cliner_leader':
+      return '/cleaning/clients/';
+    case 'repair_construction':
+    case 'repair_construction_leader':
+      return '/renovation/clients/';
+    case 'design':
+    case 'design_leader':
+      return '/design/clients/';
+    case 'store':
+    case 'store_leader':
+      return '/store/clients/';
   }
 };
 
-const ClientsList = ({ token, onBack, category }) => {
-  const [clients, setClients] = useState([]);
-  const [error, setError] = useState('');
-  const [editingClient, setEditingClient] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newClient, setNewClient] = useState({ name: '', phone: '' });
+/**
+ * ClientsAdminPanel
+ * 
+ * A unified admin UI for listing, searching, paginating,
+ * and performing CRUD on client contacts across modules.
+ */
+const ClientsAdminPanel = ({ token, category, onBack }) => {
+  // --- STATE ---
+  const [clients, setClients] = useState([]);           // Raw list from server
+  const [loading, setLoading] = useState(true);         // Loading indicator
+  const [error, setError] = useState('');               // Error message
 
-  // Use the helper to determine the endpoint based on category.
-  const endpoint = getEndpoint(category);
+  const [filterText, setFilterText] = useState('');     // Name/phone filter
+  const [page, setPage] = useState(1);                  // Pagination current page
+  const [pageSize, setPageSize] = useState(10);         // Items per page
 
-  const fetchClients = async () => {
+  const [editing, setEditing] = useState(null);         // { id, name, phone } or null
+  const [form, setForm] = useState({                    // New client form
+    name: '',
+    phone: '',
+  });
+  const [showAdd, setShowAdd] = useState(false);        // Toggle add form
+
+  const endpoint = getEndpoint(category);               // /module/clients/
+
+  // --- FETCH CLIENTS ---
+  const fetchClients = useCallback(async () => {
+    setLoading(true);
+    setError('');
     try {
-      const response = await axios.get(endpoint, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Filter for orders that have valid name and phone.
-      // (Assumes the response is an array of orders/clients.)
-      const activeClients = response.data.filter(
-        (order) => order.name && order.phone
-      );
-      // Map the relevant fields.
-      const clientContacts = activeClients.map((order) => ({
-        id: order.id,
-        name: order.name,
-        phone: order.phone,
-      }));
-      setClients(clientContacts);
-      setError('');
+           const { data } = await axios.get(endpoint, {
+               baseURL: process.env.REACT_APP_API_URL,
+               headers: { Authorization: `Bearer ${token}` },
+             });
+             // ensure we always get an array
+             const list = Array.isArray(data)
+               ? Array.isArray(data[0]) ? data[0] : data
+               : [];
+             setClients(list);
     } catch (err) {
-      console.error(err);
-      setError('Failed to fetch client contacts.');
+      console.error('Error fetching clients:', err);
+      setError('Failed to load client contacts.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [endpoint, token]);
 
   useEffect(() => {
     fetchClients();
-  }, [endpoint]); // re-fetch if endpoint changes
+    setPage(1);
+  }, [fetchClients]);
 
-  const handleDelete = async (clientId) => {
-    try {
-      await axios.delete(`${endpoint}${clientId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchClients();
-    } catch (err) {
-      console.error(err);
-      setError('Failed to delete client.');
-    }
+  // --- FILTER & PAGINATION ---
+  const filtered = clients.filter(c =>
+    c.name.toLowerCase().includes(filterText.toLowerCase()) ||
+    c.phone.toLowerCase().includes(filterText.toLowerCase())
+  );
+  const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  // --- HANDLERS ---
+  const handleFilterChange = (e) => {
+    setFilterText(e.target.value);
+    setPage(1);
   };
 
-  const handleEdit = (client) => {
-    setEditingClient({ ...client });
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setPage(newPage);
   };
 
-  const handleSaveEdit = async () => {
+  const startEdit = (client) => {
+    setEditing({ ...client });
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setError('');
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditing(prev => ({ ...prev, [name]: value }));
+  };
+
+  const saveEdit = async () => {
+    if (!editing) return;
+    setError('');
     try {
-      await axios.put(`${endpoint}${editingClient.id}`, editingClient, {
+      await axios.put(`${endpoint}${editing.id}/`, editing, {
+        baseURL: process.env.REACT_APP_API_URL,
         headers: { Authorization: `Bearer ${token}` },
       });
-      setEditingClient(null);
-      fetchClients();
+      setClients(prev =>
+        prev.map(c => (c.id === editing.id ? editing : c))
+      );
+      setEditing(null);
     } catch (err) {
-      console.error(err);
+      console.error('Error updating client:', err);
       setError('Failed to update client.');
     }
   };
 
-  const handleAddClient = async (e) => {
-    e.preventDefault();
+  const deleteClient = async (id) => {
+    if (!window.confirm('Delete this client?')) return;
+    setError('');
     try {
-      await axios.post(endpoint, newClient, {
+      await axios.delete(`${endpoint}${id}/`, {
+        baseURL: process.env.REACT_APP_API_URL,
         headers: { Authorization: `Bearer ${token}` },
       });
-      setNewClient({ name: '', phone: '' });
-      setShowAddForm(false);
-      fetchClients();
+      setClients(prev => prev.filter(c => c.id !== id));
     } catch (err) {
-      console.error(err);
+      console.error('Error deleting client:', err);
+      setError('Failed to delete client.');
+    }
+  };
+
+  const toggleAdd = () => {
+    setShowAdd(prev => !prev);
+    setForm({ name: '', phone: '' });
+    setError('');
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const submitAdd = async (e) => {
+    e.preventDefault();
+    setError('');
+    try {
+      const resp = await axios.post(endpoint, form, {
+        baseURL: process.env.REACT_APP_API_URL,
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setClients(prev => [...prev, resp.data]);
+      setForm({ name: '', phone: '' });
+      setShowAdd(false);
+    } catch (err) {
+      console.error('Error adding client:', err);
       setError('Failed to add client.');
     }
   };
 
+  // --- RENDER ---
   return (
-    <div className="clients-list">
-      <h3>Client Contacts ({category})</h3>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <button onClick={() => setShowAddForm(!showAddForm)}>
-        {showAddForm ? 'Hide Add Form' : 'Add Client'}
-      </button>
-      {showAddForm && (
-        <div className="add-client-form">
-          <h4>Add New Client</h4>
-          <form onSubmit={handleAddClient}>
+    <div className="clients-admin-panel">
+      <header className="cap-header">
+        <button className="cap-back-btn" onClick={onBack}>← Back</button>
+        <h2 className="cap-title">Clients: {category.replace(/_/g, ' ')}</h2>
+      </header>
+
+      <div className="cap-controls">
+        <input
+          type="text"
+          className="cap-filter-input"
+          placeholder="Search by name or phone…"
+          value={filterText}
+          onChange={handleFilterChange}
+        />
+        <button className="cap-add-btn" onClick={toggleAdd}>
+          {showAdd ? 'Hide Add Form' : 'Add Client'}
+        </button>
+      </div>
+
+      {showAdd && (
+        <form className="cap-add-form" onSubmit={submitAdd}>
+          <div className="cap-form-row">
+            <label>Name</label>
             <input
-              type="text"
-              placeholder="Name"
-              value={newClient.name}
-              onChange={(e) =>
-                setNewClient({ ...newClient, name: e.target.value })
-              }
+              name="name"
+              value={form.name}
+              onChange={handleFormChange}
               required
             />
+          </div>
+          <div className="cap-form-row">
+            <label>Phone</label>
             <input
-              type="text"
-              placeholder="Phone"
-              value={newClient.phone}
-              onChange={(e) =>
-                setNewClient({ ...newClient, phone: e.target.value })
-              }
+              name="phone"
+              value={form.phone}
+              onChange={handleFormChange}
               required
             />
-            <button type="submit">Submit Client</button>
-          </form>
-        </div>
+          </div>
+          <div className="cap-form-actions">
+            <button type="submit">Submit</button>
+            <button type="button" onClick={toggleAdd}>Cancel</button>
+          </div>
+        </form>
       )}
-      <hr />
-      {clients && clients.length > 0 ? (
-        <table className="clients-table">
-          <thead>
-            <tr>
-              <th>Client Name</th>
-              <th>Phone</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {clients.map((client) =>
-              editingClient && editingClient.id === client.id ? (
-                <tr key={client.id}>
-                  <td>
-                    <input
-                      type="text"
-                      value={editingClient.name}
-                      onChange={(e) =>
-                        setEditingClient({
-                          ...editingClient,
-                          name: e.target.value,
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      value={editingClient.phone}
-                      onChange={(e) =>
-                        setEditingClient({
-                          ...editingClient,
-                          phone: e.target.value,
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button onClick={handleSaveEdit}>Save</button>
-                    <button onClick={() => setEditingClient(null)}>
-                      Cancel
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={client.id}>
-                  <td>{client.name}</td>
-                  <td>{client.phone}</td>
-                  <td>
-                    <button onClick={() => handleEdit(client)}>Edit</button>
-                    <button onClick={() => handleDelete(client.id)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              )
-            )}
-          </tbody>
-        </table>
+
+      {error && <div className="cap-error">{error}</div>}
+      {loading ? (
+        <div className="cap-loading">Loading clients…</div>
       ) : (
-        <p>No client contacts found.</p>
+        <>
+          <table className="cap-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th className="cap-actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.length === 0 ? (
+                <tr>
+                  <td colSpan="3" className="cap-no-data">
+                    No clients found.
+                  </td>
+                </tr>
+              ) : paginated.map(client => (
+                <tr key={client.id}>
+                  <td>
+                    {editing?.id === client.id ? (
+                      <input
+                        name="name"
+                        value={editing.name}
+                        onChange={handleEditChange}
+                      />
+                    ) : (
+                      client.name
+                    )}
+                  </td>
+                  <td>
+                    {editing?.id === client.id ? (
+                      <input
+                        name="phone"
+                        value={editing.phone}
+                        onChange={handleEditChange}
+                      />
+                    ) : (
+                      client.phone
+                    )}
+                  </td>
+                  <td>
+                    {editing?.id === client.id ? (
+                      <>
+                        <button onClick={saveEdit}>Save</button>
+                        <button onClick={cancelEdit}>Cancel</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => startEdit(client)}>Edit</button>
+                        <button onClick={() => deleteClient(client.id)}>Delete</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div className="cap-pagination">
+            <button
+              onClick={() => handlePageChange(page - 1)}
+              disabled={page === 1}
+            >‹ Prev</button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i + 1}
+                className={page === i + 1 ? 'active' : ''}
+                onClick={() => handlePageChange(i + 1)}
+              >{i + 1}</button>
+            ))}
+            <button
+              onClick={() => handlePageChange(page + 1)}
+              disabled={page === totalPages}
+            >Next ›</button>
+          </div>
+
+          <div className="cap-page-size">
+            <label>Items per page:</label>
+            <select
+              value={pageSize}
+              onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
+            >
+              {[5, 10, 20, 50].map(n => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
+        </>
       )}
-      <button onClick={onBack}>Back</button>
     </div>
   );
 };
 
-export default ClientsList;
+ClientsAdminPanel.propTypes = {
+  token: PropTypes.string.isRequired,
+  category: PropTypes.string.isRequired,
+  onBack: PropTypes.func.isRequired,
+};
+
+export default ClientsAdminPanel;

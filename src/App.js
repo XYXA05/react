@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './App.css';
 import './CalendarView.css';
@@ -19,6 +19,9 @@ import RenovationProjects from './RenovationProjectsControl'; // For Renovation 
 import CleaningOrders from './CleaningControl';       // For Cleaning orders
 import AdminRolesPanel from './AdminRolesPanel';
 import AdminOrdersPanel     from './AdminOrdersPanel';
+import AdminMenuManager from './AdminMenuManager';  // NEW: Menu Manager
+import StorePage from './StorePage';
+
 const API_URL = 'http://localhost:8000'; // Replace with your backend URL
 
 function App() {
@@ -33,6 +36,14 @@ function App() {
   const [view, setView] = useState(token ? 'dashboard' : 'login');
   const [error, setError] = useState('');
 
+  useEffect(() => {
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      } else {
+        delete axios.defaults.headers.common['Authorization'];
+    }
+    }, [token]);
+    
   // --- LOGIN HANDLER ---
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -93,13 +104,16 @@ function App() {
       {error && <p style={{ color: 'red' }}>{error}</p>}
 
       {/* Common views (for admin, realtor, team_leader, etc.) */}
+      {view === 'store' && (
+        <StorePage token={token} onBack={() => setView('dashboard')} />
+      )}
       {view === 'dashboard' && <Dashboard />}
       {view === 'apartments' && <MainPage />}
       {view === 'orders' && <OrdersList token={token} onBack={() => setView('dashboard')} />}
       {view === 'clients' && (
         <ClientsList token={token} onBack={() => setView('dashboard')} category="default" />
       )}
-      {view === 'statistics' && <StatisticsDisplay token={token} onBack={() => setView('dashboard')} />}
+      {view === 'statistics' && <StatisticsDisplay userType={role} token={token} />}
       {view === 'documents' && <Documents />}
       {view === 'settings' && <Settings />}
       {view === 'schedule' && <Schedule />}
@@ -111,6 +125,7 @@ function App() {
       {view === 'channelControl' && <ChannelControl />}
       {view === 'create_user' && <CreateUser />}
       {view === 'logs' && <ActionLogsMonitoring />}
+      {view === 'adminMenu' && role === 'admin' && <AdminMenuManager />}  {/* Menu Manager page */}
       {view === 'adminApartments' && (
   <AdminRolesPanel token={token} onBack={() => setView('dashboard')} />
 )}
@@ -150,6 +165,11 @@ function App() {
           <CleaningOrders />
         </div>
       )}
+          {role === 'admin' && (
+      <button onClick={() => setView('adminMenu')} style={{ fontWeight: 'bold', color: '#007bff' }}>
+        🔧 Menu Manager
+      </button>
+    )}
     </div>
   );
 }
@@ -235,6 +255,7 @@ const Navigation = ({ setView, logout, role, token }) => {
       <button onClick={() => setView('statistics')}>Statistics</button>{' '}
       <button onClick={() => setView('create_user')}>Create User</button>{' '}
       <button onClick={() => setView('logs')}>Log Users</button>{' '}
+      <button onClick={() => setView('store')}>Store</button>
       {renderAdminButtons()}
       <button onClick={logout}>Logout</button>
       <hr />

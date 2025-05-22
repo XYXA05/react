@@ -1,6 +1,5 @@
-// ChannelControl.js
+import './ChannelControl.css';  
 import React, { useState, useEffect } from 'react';
-
 const ChannelControl = () => {
   // Templates state and modal controls
   const [templates, setTemplates] = useState([]);

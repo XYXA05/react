@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import * as ApartmentService from './ApartmentService';
 import RentalCalendar from './RentalCalendar'; // Ensure this component exists
-import Navigation from './Navigation';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import html2canvas from 'html2canvas';
 
@@ -81,63 +80,116 @@ const MainPage = () => {
         return { ...ap, files: reorder(ap.files, source.index, destination.index) };
       }));
     };
- // Poster generation: hero + details + 5×2 grid
- const makePoster = async ad => {
-  const container = document.createElement('div');
-  Object.assign(container.style, {
-    width: '1080px', margin: '0 auto', background: '#1f3a1f',
-    display: 'flex', flexDirection: 'column', color:'white', fontFamily:'sans-serif'
-  });
-
-  // Hero image
-  const hero = new Image(); hero.crossOrigin='anonymous';
-  hero.src = ad.files[0]?.file_path || '';
-  Object.assign(hero.style, { width:'100%', height:'400px', objectFit:'cover' });
-  await new Promise(r => hero.onload=r);
-  container.appendChild(hero);
-
-  // Title+Price
-  const strip = document.createElement('div');
-  Object.assign(strip.style, {
-    display:'flex', justifyContent:'space-between', alignItems:'center', padding:'20px',
-    fontSize:'48px', fontWeight:'bold', textTransform:'uppercase'
-  });
-  const t = document.createElement('div'); t.innerText='ОРЕНДА';
-  const p = document.createElement('div');
-  p.innerText = `$${parseFloat(ad.price.replace(/[^\d.]/g,''))||''}`;
-  strip.append(t,p);
-  container.appendChild(strip);
-
-  // Details
-  const det = document.createElement('div');
-  Object.assign(det.style, { display:'flex', justifyContent:'space-between', padding:'0 20px 20px', fontSize:'24px', lineHeight:'1.2' });
-  det.innerHTML = `
-    <div>🏠 1 КІМ. КВАРТИРА</div>
-    <div>🏢 ${ad.room||''}</div>
-    <div>📍 ${ad.location_date||''}</div>
-    <div>🆔 КОД ${ad.id}</div>
-  `;
-  container.appendChild(det);
-
-  // 5×2 grid
-  const grid = document.createElement('div');
-  Object.assign(grid.style, {
-    display:'grid', gridTemplateColumns:'repeat(5,1fr)', gridTemplateRows:'repeat(2,200px)', gap:'10px', padding:'0 20px 20px'
-  });
-  await Promise.all(ad.files.slice(0,10).map(img=>new Promise(res=>{
-    const el=new Image(); el.crossOrigin='anonymous'; el.src=img.file_path;
-    Object.assign(el.style,{width:'100%',height:'100%',objectFit:'cover'});
-    el.onload=()=>{grid.appendChild(el);res();}; el.onerror=res;
-  })));
-  container.appendChild(grid);
-
-  // Snapshot & download
-  document.body.appendChild(container);
-  const canvas = await html2canvas(container,{useCORS:true});
-  const link=document.createElement('a'); link.download=`poster-${ad.id}.png`;
-  link.href=canvas.toDataURL('image/png'); link.click();
-  document.body.removeChild(container);
-};
+    const makePoster = async ad => {
+      // 1) fetch & pick the image‑template
+      const templates = await fetch('http://127.0.0.1:8000/templates').then(r => r.json());
+      const tpl = templates.find(t =>
+        t.category === 'image' &&
+        t.type_deal === ad.type_deal &&
+        t.type_object === ad.type_object
+      );
+      if (!tpl) {
+        throw new Error(`No image-template for deal=${ad.type_deal}, object=${ad.type_object}`);
+      }
+    
+      // pull text, photo count & bgcolor straight from the template
+      const { template_text, count_photo, color: bgColor = '#1f3a1f' } = tpl;
+      const maxPhotos = parseInt(count_photo, 10);
+    
+      // 2) build container
+      const container = document.createElement('div');
+      Object.assign(container.style, {
+        width: '1080px',
+        margin: '0 auto',
+        background: bgColor,
+        color: 'white',
+        fontFamily: 'sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'stretch'
+      });
+    
+      // 3) split first N photos into top/bottom halves
+      const photos     = ad.files.slice(0, maxPhotos);
+      const splitIndex = Math.ceil(photos.length / 2);
+      const topPhotos  = photos.slice(0, splitIndex);
+      const botPhotos  = photos.slice(splitIndex);
+    
+      // grid builder with watermark
+      const buildGrid = photoArray => {
+        const grid = document.createElement('div');
+        const cols = Math.min(photoArray.length, 5);
+        Object.assign(grid.style, {
+          display: 'grid',
+          gridTemplateColumns: `repeat(${cols}, 1fr)`,
+          gridAutoRows: '200px',
+          gap: '10px',
+          padding: '20px'
+        });
+    
+        photoArray.forEach(({ file_path }) => {
+          const wrap = document.createElement('div');
+          wrap.style.position = 'relative';
+          wrap.style.overflow = 'hidden';
+    
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.src = file_path;
+          Object.assign(img.style, {
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            display: 'block'
+          });
+          wrap.appendChild(img);
+    
+          const wm = document.createElement('div');
+          wm.innerText = 'my watermark';
+          Object.assign(wm.style, {
+            position: 'absolute',
+            bottom: '5px',
+            right: '5px',
+            fontSize: '16px',
+            color: 'rgba(255,255,255,0.7)',
+            pointerEvents: 'none'
+          });
+          wrap.appendChild(wm);
+    
+          grid.appendChild(wrap);
+        });
+    
+        return grid;
+      };
+    
+      // append top grid, text, then bottom grid
+      if (topPhotos.length) container.appendChild(buildGrid(topPhotos));
+    
+      const textBlock = document.createElement('div');
+      Object.assign(textBlock.style, {
+        padding: '20px',
+        columnCount: 2,
+        columnGap: '40px',
+        fontSize: '24px',
+        lineHeight: '1.4'
+      });
+      textBlock.innerText = template_text.replace(/\{(\w+)\}/g, (_, key) => ad[key] || '');
+      container.appendChild(textBlock);
+    
+      if (botPhotos.length) container.appendChild(buildGrid(botPhotos));
+    
+      // 4) render & download at 2× resolution
+      document.body.appendChild(container);
+      const canvas = await html2canvas(container, {
+        useCORS: true,
+        scale: window.devicePixelRatio || 2
+      });
+      const link = document.createElement('a');
+      link.download = `poster-${ad.id}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      document.body.removeChild(container);
+    };
+    
 
 
 
@@ -557,31 +609,61 @@ const MainPage = () => {
         </div>
       </section>
 
-      {/* Apartments List Section */}
+
       <section className="apartments-list card">
-        <h2>Apartments</h2>
-        {filteredApartments.length === 0 ? (
-          <div className="no-apartments">No apartments found.</div>
-        ) : (
-          filteredApartments.map(ad => (
-            <div key={ad.id} className="apartment-item">
-              <div
-                className="apartment-header"
-                onClick={() => {
-                  ad.expanded = !ad.expanded;
-                  setApartments([...apartments]);
-                }}
-              >
-                <p><strong>{ad.title}</strong></p>
-                <p>ID: {ad.id}</p>
-                <p>Deal: {ad.type_deal}</p>
-                <p>Object: {ad.type_object}</p>
-                <p>Status: {ad.ad_status}</p>
-                <button onClick={() => setSelectedProperty(ad)}>
-                  View Calendar
-                </button>
-                <button className="advanced">{ad.expanded ? 'Collapse' : 'Expand'}</button>
-              </div>
+      <h2>Apartments</h2>
+
+      {filteredApartments.length === 0 ? (
+        <div className="no-apartments">No apartments found.</div>
+      ) : (
+        filteredApartments.map(ad => (
+          <div key={ad.id} className="apartment-item">
+            {/** ——— HEADER ROW ——— */}
+            <div
+              className="apartment-header"
+              onClick={() => {
+                ad.expanded = !ad.expanded;
+                setApartments([...apartments]);
+              }}
+            >
+          {/* № */}      <div className="col col-id">{ad.id}</div>
+          {/* Район */}  <div className="col col-region">{ad.region}</div>
+          {/* Вулиця */}<div className="col col-street">{ad.street}</div>
+          {/* ЖК */}     <div className="col col-complex">{ad.residential_complex}</div>
+          {/* Площа */}  <div className="col col-area">{ad.square} m²</div>
+          {/* Кімнат */} <div className="col col-rooms">{ad.room}</div>
+          {/* Ціна */}   <div className="col col-price">{ad.price}</div>
+          {/* Валюта */}<div className="col col-currency">{ad.currency}</div>
+          {/* USD */}    <div className="col col-usd">{convertToUSD(ad.price).toFixed(0)} USD</div>
+          {/* Телефон */}<div className="col col-phone">{ad.phone}</div>
+          {/* Статус */} <div className="col col-status">
+          <select value={ad.ad_status} onChange={e => onStatusChange(e, ad.id)}>
+                           {statusOptions.map(s => <option key={s} value={s}>{s}</option>)}
+                         </select>
+                       </div>
+          {/* Актуальність */} <div className="col col-actual">{ad.is_actual ? '✅' : ''}</div>
+          {/* Д (your “Д” flag column) */} <div className="col col-flag">{ad.dFlag}</div>
+          {/* T (your “T” column) */}       <div className="col col-t">{ad.tValue}</div>
+          {/* Google */}  <div className="col col-google">
+                          <a href={ad.googleLink} target="_blank" rel="noopener">
+                            <img src="/icons/google.svg" alt="G" />
+                          </a>
+                        </div>
+          {/* Telegram */}<div className="col col-telegram">
+                          <a href={ad.telegramLink} target="_blank" rel="noopener">
+                            <img src="/icons/telegram.svg" alt="T" />
+                          </a>
+                        </div>
+          {/* OLX link */}<div className="col col-olx">
+                          <a href={ad.olxLink} target="_blank" rel="noopener">OLX</a>
+                        </div>
+          {/* ID OLX */}   <div className="col col-olx-id">{ad.id_olx}</div>
+          {/* Дата конт. */}<div className="col col-date">{ad.contact_date}</div>
+          {/* Автор */}   <div className="col col-author">{ad.author}</div>
+          {/* Коментар */}<div className="col col-comment">{ad.comment}</div>
+          {/* Calendar */}<button className="col col-calendar-btn" onClick={() => setSelectedProperty(ad)}>📅</button>
+          {/* Expand */}  <button className="col col-expand-btn">{ad.expanded ? '–' : '+'}</button>
+            </div>
               {ad.expanded && (
                 <div className="apartment-details">
                   <input type="file" multiple onChange={(e) => uploadImages(e, ad.id)} className="animated" />
@@ -593,11 +675,19 @@ const MainPage = () => {
                           <Draggable key={img.id} draggableId={`${img.id}`} index={i}>
                             {(prov,snap)=>(
                               <div ref={prov.innerRef} {...prov.draggableProps} {...prov.dragHandleProps} className={snap.isDragging?'dragging':''}>
-                                <img src={new URL(img.file_path).pathname} alt={ad.title} />
-                                <button onClick={()=>applyWatermark(img.id,ad.id)}>Watermark</button>
-                                <button onClick={()=>removeWatermarkAI(img.id,ad.id)}>Remove AI</button>
-                                <button onClick={()=>deleteImage(img.id)}>Delete</button>
+                              <img src={img.file_path} alt={ad.title} class="image-item__photo"/>
+                              <div class="image-item__actions">
+                                <button class="btn btn--watermark" data-action="watermark">
+                                  Watermark
+                                </button>
+                                <button class="btn btn--remove-ai" data-action="remove-ai">
+                                  Remove AI
+                                </button>
+                                <button class="btn btn--delete" data-action="delete">
+                                  Delete
+                                </button>
                               </div>
+                            </div>
                             )}
                           </Draggable>
                         ))}
@@ -813,62 +903,6 @@ const MainPage = () => {
           ))
         )}
       </section>
-
-      {/* Template Management Section for Admin */}
-      {userRole === "admin" && (
-        <section className="template-management card">
-          <h2>Manage Templates</h2>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            saveTemplate();
-          }}>
-            <input
-              type="text"
-              value={templateTitle}
-              onChange={(e) => setTemplateTitle(e.target.value)}
-              name="title"
-              placeholder="Template Title"
-              required
-              className="animated"
-            />
-            <textarea
-              value={templateContent}
-              onChange={(e) => setTemplateContent(e.target.value)}
-              name="content"
-              placeholder="Template Content"
-              required
-              className="animated"
-            ></textarea>
-            <button type="submit" className="advanced">{selectedTemplate ? "Update" : "Add"} Template</button>
-          </form>
-          <ul>
-            {templates.map(template => (
-              <li key={template.id}>
-                <h3>{template.name}</h3>
-                <p>{template.template_text}</p>
-                <button className="advanced" onClick={() => editTemplate(template)}>Edit</button>
-                <button className="advanced" onClick={() => deleteTemplate(template.id)}>Delete</button>
-              </li>
-            ))}
-          </ul>
-          <div className="publish-section">
-            <label htmlFor="templateSelect">Select Template for Publishing:</label>
-            <select
-              id="templateSelect"
-              value={selectedTemplateName}
-              onChange={(e) => setSelectedTemplateName(e.target.value)}
-              className="animated"
-            >
-              {templates.map(template => (
-                <option key={template.id} value={template.name}>{template.name}</option>
-              ))}
-            </select>
-            <button className="advanced" onClick={() => publishToChannel(/* Provide an apartment id as needed */)}>
-              Publish to Channel
-            </button>
-          </div>
-        </section>
-      )}
     </div>
     </DragDropContext>
 
