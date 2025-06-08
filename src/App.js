@@ -110,18 +110,11 @@ function App() {
       {view === 'dashboard' && <Dashboard />}
       {view === 'apartments' && <MainPage />}
       {view === 'orders' && <OrdersList token={token} onBack={() => setView('dashboard')} />}
-      {view === 'clients' && (
-        <ClientsList token={token} onBack={() => setView('dashboard')} category="default" />
-      )}
       {view === 'statistics' && <StatisticsDisplay userType={role} token={token} />}
       {view === 'documents' && <Documents />}
-      {view === 'settings' && <Settings />}
-      {view === 'schedule' && <Schedule />}
       {view === 'rentalCalendar' && (
         <RentalCalendar propertyId={1} category="default" onBack={() => setView('apartments')} />
       )}
-      {view === 'reviewsAndDeals' && <ReviewsAndDeals />}
-      {view === 'call' && <Call />}
       {view === 'channelControl' && <ChannelControl />}
       {view === 'create_user' && <CreateUser />}
       {view === 'logs' && <ActionLogsMonitoring />}
@@ -230,9 +223,6 @@ const Navigation = ({ setView, logout, role, token }) => {
           <button onClick={() => setView('adminApartments')}>
         Admin Apartments
       </button>
-      <button onClick={() => setView('adminOrders')}>
-        Admin Orders
-      </button>
         </>
       );
     }
@@ -243,19 +233,13 @@ const Navigation = ({ setView, logout, role, token }) => {
     <nav style={{ marginBottom: '20px' }}>
       <button onClick={() => setView('dashboard')}>Dashboard</button>{' '}
       <button onClick={() => setView('documents')}>Documents</button>{' '}
-      <button onClick={() => setView('settings')}>Settings</button>{' '}
-      <button onClick={() => setView('schedule')}>Schedule</button>{' '}
       <button onClick={() => setView('rentalCalendar')}>Rental Calendar</button>{' '}
-      <button onClick={() => setView('reviewsAndDeals')}>Reviews & Deals</button>{' '}
-      <button onClick={() => setView('call')}>Call</button>{' '}
       <button onClick={() => setView('channelControl')}>Channel Control</button>{' '}
       <button onClick={() => setView('apartments')}>Apartments</button>{' '}
       <button onClick={() => setView('orders')}>Orders</button>{' '}
-      <button onClick={() => setView('clients')}>Clients</button>{' '}
       <button onClick={() => setView('statistics')}>Statistics</button>{' '}
       <button onClick={() => setView('create_user')}>Create User</button>{' '}
       <button onClick={() => setView('logs')}>Log Users</button>{' '}
-      <button onClick={() => setView('store')}>Store</button>
       {renderAdminButtons()}
       <button onClick={logout}>Logout</button>
       <hr />
@@ -277,29 +261,6 @@ const Documents = () => (
     <p>Documents functionality is not implemented yet.</p>
   </div>
 );
-const Settings = () => (
-  <div>
-    <h3>Settings</h3>
-    <p>Settings functionality is not implemented yet.</p>
-  </div>
-);
-const Schedule = () => (
-  <div className="card">
-    <h3>Schedule</h3>
-    <p>Schedule management functionality goes here.</p>
-  </div>
-);
-const ReviewsAndDeals = () => (
-  <div className="card">
-    <h3>Reviews and Deals</h3>
-    <p>This view displays reviews and deals.</p>
-  </div>
-);
-const Call = () => (
-  <div className="card">
-    <h3>Call</h3>
-    <p>Call functionality goes here.</p>
-  </div>
-);
+
 
 export default App;

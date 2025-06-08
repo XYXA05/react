@@ -5,6 +5,7 @@ import './StatisticsDisplay.css'
 
 const API_URL = 'http://localhost:8000'
 
+// Якщо потрібно змінити відповідність ролей → модулі, правте тут.
 const roleModulesMap = {
   store:                      ['store'],
   store_leader:               ['store'],
@@ -20,6 +21,7 @@ const roleModulesMap = {
   team_leader:                ['store','design','renovation','cleaning','mediabuyer'],
 }
 
+// Трохи «людські» назви для кожного модуля
 const moduleLabels = {
   store:      'Інтернет-магазин',
   design:     'Дизайн',
@@ -31,22 +33,38 @@ const moduleLabels = {
 export default function StatisticsDisplay({ userType, token }) {
   const [allowedModules, setAllowedModules] = useState([])
   const [selectedModule, setSelectedModule] = useState('')
-  const [stats, setStats]                   = useState(null)
-  const [loading, setLoading]               = useState(false)
+  const [stats, setStats]     = useState(null)
+  const [loading, setLoading] = useState(false)
 
-  // figure out which modules this userType can see
+  // За замовчуванням беремо всі ключі з moduleLabels:
+  const allModules = Object.keys(moduleLabels)
+
+  // Коли змінюється userType — визначаємо, які саме модулі показувати
   useEffect(() => {
-    let mods = roleModulesMap[userType] || []
-    if (mods.length === 0) {
-      const base = userType?.replace(/_leader$/, '')
-      mods = roleModulesMap[base] || []
+    let mods = []
+
+    // Якщо це admin — даємо доступ до всіх
+    if (userType === 'admin') {
+      mods = allModules.slice()
+    } else {
+      // Шукаємо прямий збіг у roleModulesMap
+      mods = roleModulesMap[userType] || []
+
+      // Якщо «_leader»-версія (наприклад, "store_leader") не знайшлась, 
+      // беремо базовий тип без суфіксу "_leader"
+      if (mods.length === 0 && userType?.endsWith('_leader')) {
+        const base = userType.replace(/_leader$/, '')
+        mods = roleModulesMap[base] || []
+      }
     }
+
     setAllowedModules(mods)
     setSelectedModule(mods[0] || '')
     setStats(null)
+
   }, [userType])
 
-  // fetch whenever selectedModule changes
+  // Коли обираємо новий модуль (або змінився токен) — тягнемо статистику
   useEffect(() => {
     if (!selectedModule) return
 
@@ -55,7 +73,9 @@ export default function StatisticsDisplay({ userType, token }) {
       .get(`${API_URL}/statistics/${selectedModule}`, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      .then(res => setStats(res.data))
+      .then(res => {
+        setStats(res.data)
+      })
       .catch(err => {
         console.error(err)
         setStats(null)

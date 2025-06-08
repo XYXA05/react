@@ -1,6 +1,6 @@
 /* Container */
 .container {
-    max-width: 1200px;
+    max-width: 1420px;
     margin: 0 auto;
     padding: 20px;
     font-family: Arial, sans-serif;
@@ -46,8 +46,8 @@
   
   /* Projects List */
   .projects-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 16px;
   }
   .project-card {

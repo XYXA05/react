@@ -1,26 +1,27 @@
 // src/RenovationProjectsControl.js
-import React, { useState, useEffect, useCallback } from 'react';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import RentalCalendar from './RentalCalendar';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import html2canvas from 'html2canvas';
 import './control.css';
 
-const API_URL = 'http://localhost:8000'; // Adjust backend URL as needed
+const API_URL = 'http://localhost:8000'; // adjust if necessary
+const PAGE_SIZE = 10;
 
 const RenovationProjectsControl = () => {
-  // Role and view state
-  const [userRole] = useState('admin'); // Replace with auth context
-  const [view, setView] = useState('list');
+  // ─── VIEW & ROLE STATE ─────────────────────────────────────────────────────
+  const [view, setView] = useState('list');             // 'list' | 'form' | 'calendar'
   const [selectedProject, setSelectedProject] = useState(null);
 
-  // Data and UI states
-  const [projects, setProjects] = useState([]);
+  // ─── DATA STATE ─────────────────────────────────────────────────────────────
+  const [projects, setProjects] = useState([]);         // all fetched projects
   const [filteredProjects, setFilteredProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Filter states
+  // ─── FILTER STATE ───────────────────────────────────────────────────────────
   const [searchText, setSearchText] = useState('');
   const [addressFilter, setAddressFilter] = useState('');
   const [workTypeFilter, setWorkTypeFilter] = useState('');
@@ -31,185 +32,322 @@ const RenovationProjectsControl = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  // Form state for adding/editing
+  // ─── PAGINATION STATE ───────────────────────────────────────────────────────
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageCount = Math.ceil(filteredProjects.length / PAGE_SIZE);
+  const paginatedProjects = filteredProjects.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
+  // ─── FORM STATE ─────────────────────────────────────────────────────────────
+  // Include name/phone/email/telegram_username + renovation fields + photos[]
   const initialForm = {
+    name: '',
+    phone: '',
+    email: '',
+    telegram_username: '',
     address: '',
     work_type: '',
     materials: '',
     duration: '',
     cost: '',
-    photos: [],
     execution_stages: '',
     comment: '',
     start_date: '',
-    end_date: ''
+    end_date: '',
+    photos: [] // array of { id, file_path, filename } from server or { id:'new-...', file, preview } locally
   };
   const [formProject, setFormProject] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
 
-  // Fetch projects on mount
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  // ─── REF FOR EXPORT (html2canvas) ───────────────────────────────────────────
+  const exportRef = useRef(null);
 
-  // Re-apply filters when dependencies change
-  useEffect(() => {
-    applyFilters();
-  }, [projects, searchText, addressFilter, workTypeFilter, durationMin, durationMax, costMin, costMax, dateFrom, dateTo]);
-
-  // Fetch all renovation projects
-  const fetchProjects = async () => {
+  // ─── FETCH ALL RENOVATION PROJECTS ─────────────────────────────────────────
+  const fetchProjects = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await axios.get(`${API_URL}/renovation/projects/`);
-      // Normalize photos array
-      const normalized = data.map(p => ({
+      // Ensure any returned `photos` field (if present) is always an array:
+      const normalized = data.map((p) => ({
         ...p,
         photos: Array.isArray(p.photos) ? p.photos : []
       }));
       setProjects(normalized);
       setError('');
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch projects:', err);
       setError('Failed to load projects.');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  // Apply filter criteria
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
+
+  // ─── APPLY FILTERS ──────────────────────────────────────────────────────────
   const applyFilters = useCallback(() => {
     let result = [...projects];
 
-    if (searchText) {
-      const q = searchText.toLowerCase();
-      result = result.filter(p =>
-        (p.comment || '').toLowerCase().includes(q) ||
-        (p.execution_stages || '').toLowerCase().includes(q)
+    if (searchText.trim()) {
+      const q = searchText.trim().toLowerCase();
+      result = result.filter(
+        (p) =>
+          (p.comment || '').toLowerCase().includes(q) ||
+          (p.execution_stages || '').toLowerCase().includes(q)
       );
     }
-    if (addressFilter) {
-      result = result.filter(p => p.address.toLowerCase().includes(addressFilter.toLowerCase()));
+    if (addressFilter.trim()) {
+      const q = addressFilter.trim().toLowerCase();
+      result = result.filter((p) =>
+        p.address.toLowerCase().includes(q)
+      );
     }
-    if (workTypeFilter) {
-      result = result.filter(p => p.work_type === workTypeFilter);
+    if (workTypeFilter.trim()) {
+      result = result.filter((p) => p.work_type === workTypeFilter.trim());
     }
     if (durationMin) {
-      result = result.filter(p => parseFloat(p.duration) >= parseFloat(durationMin));
+      result = result.filter(
+        (p) => parseFloat(p.duration) >= parseFloat(durationMin)
+      );
     }
     if (durationMax) {
-      result = result.filter(p => parseFloat(p.duration) <= parseFloat(durationMax));
+      result = result.filter(
+        (p) => parseFloat(p.duration) <= parseFloat(durationMax)
+      );
     }
     if (costMin) {
-      result = result.filter(p => parseFloat(p.cost) >= parseFloat(costMin));
+      result = result.filter(
+        (p) => parseFloat(p.cost) >= parseFloat(costMin)
+      );
     }
     if (costMax) {
-      result = result.filter(p => parseFloat(p.cost) <= parseFloat(costMax));
+      result = result.filter(
+        (p) => parseFloat(p.cost) <= parseFloat(costMax)
+      );
     }
     if (dateFrom) {
-      result = result.filter(p => p.start_date >= dateFrom);
+      result = result.filter((p) => p.start_date >= dateFrom);
     }
     if (dateTo) {
-      result = result.filter(p => p.end_date <= dateTo);
+      result = result.filter((p) => p.end_date <= dateTo);
     }
 
     setFilteredProjects(result);
-  }, [projects, searchText, addressFilter, workTypeFilter, durationMin, durationMax, costMin, costMax, dateFrom, dateTo]);
+    setCurrentPage(1);
+  }, [
+    projects,
+    searchText,
+    addressFilter,
+    workTypeFilter,
+    durationMin,
+    durationMax,
+    costMin,
+    costMax,
+    dateFrom,
+    dateTo
+  ]);
 
-  // Handle changes in filter inputs
-  const handleFilterChange = setter => e => setter(e.target.value);
+  useEffect(() => {
+    applyFilters();
+  }, [applyFilters]);
 
-  // Handle form input changes
-  const handleFormChange = e => {
+  // ─── HANDLERS FOR FILTER INPUTS ────────────────────────────────────────────
+  const handleFilterChange = (setter) => (e) => setter(e.target.value);
+
+  // ─── HANDLERS FOR FORM INPUTS ──────────────────────────────────────────────
+  const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setFormProject(prev => ({ ...prev, [name]: value }));
+    setFormProject((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle photo uploads
-  const handlePhotoUpload = e => {
-    const files = Array.from(e.target.files).map(f => ({
-      id: `${Date.now()}-${f.name}`,
-      file: f,
-      preview: URL.createObjectURL(f)
+  // ─── HANDLE PHOTO UPLOAD (NEW FILES) ───────────────────────────────────────
+  const handlePhotoUpload = (e) => {
+    const files = Array.from(e.target.files).map((file, idx) => ({
+      id: `new-${Date.now()}-${idx}`,
+      file,
+      preview: URL.createObjectURL(file)
     }));
-    setFormProject(prev => ({
+    setFormProject((prev) => ({
       ...prev,
       photos: [...(Array.isArray(prev.photos) ? prev.photos : []), ...files]
     }));
   };
 
-  // Initialize form for editing
-  const startEditing = proj => {
+  // ─── START EDITING AN EXISTING PROJECT ─────────────────────────────────────
+  const startEditing = async (proj) => {
+    // 1) Populate all scalar fields into form state:
     setFormProject({
-      ...proj,
-      photos: Array.isArray(proj.photos) ? proj.photos : []
+      name: proj.name || '',
+      phone: proj.phone || '',
+      email: proj.email || '',
+      telegram_username: proj.telegram_username || '',
+      address: proj.address || '',
+      work_type: proj.work_type || '',
+      materials: proj.materials || '',
+      duration: proj.duration || '',
+      cost: proj.cost || '',
+      execution_stages: proj.execution_stages || '',
+      comment: proj.comment || '',
+      start_date: proj.start_date || '',
+      end_date: proj.end_date || '',
+      photos: [] // we'll overwrite next
     });
     setEditingId(proj.id);
     setView('form');
+
+    // 2) Fetch existing photos from /files/renovation/{proj.id}
+    try {
+      const { data: filesList } = await axios.get(
+        `${API_URL}/files/renovation/${proj.id}`
+      );
+      // filesList: Array<FileAdminResponse> => { id, filename, date, content_type, file_path, ... }
+      const existingPhotos = filesList.map((f) => ({
+        id: f.id,
+        file_path: f.file_path,
+        filename: f.filename
+      }));
+      setFormProject((prev) => ({ ...prev, photos: existingPhotos }));
+    } catch (err) {
+      console.error('Could not fetch existing photos:', err);
+      // We still let the user edit the rest even if photo-fetch fails
+    }
   };
 
-  // Cancel add/edit form
   const cancelForm = () => {
+    // Revoke any local objectURLs before clearing:
+    formProject.photos.forEach((p) => {
+      if (p.preview) URL.revokeObjectURL(p.preview);
+    });
     setFormProject(initialForm);
     setEditingId(null);
     setView('list');
   };
 
-  // Save new or updated project
-  const saveProject = async e => {
+  // ─── DELETE A SINGLE PHOTO (EXISTING OR NEW) ──────────────────────────────
+  const handleDeletePhoto = async (photoItem) => {
+    if (photoItem.id && typeof photoItem.id === 'number') {
+      // This is an existing photo on the server => call DELETE /files/{id}
+      try {
+        await axios.delete(`${API_URL}/files/${photoItem.id}`);
+      } catch (err) {
+        console.error('Failed to delete photo on server:', err);
+      }
+    }
+    // If it has a `preview`, revoke that objectURL:
+    if (photoItem.preview) {
+      URL.revokeObjectURL(photoItem.preview);
+    }
+    // Remove from state in either case:
+    setFormProject((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((p) => p.id !== photoItem.id)
+    }));
+  };
+
+  // ─── SAVE (CREATE OR UPDATE) ────────────────────────────────────────────────
+  const saveProject = async (e) => {
     e.preventDefault();
+
+    // 1) Build payload exactly matching your Pydantic schema:
+    const payload = {
+      name: formProject.name,
+      phone: formProject.phone,
+      email: formProject.email || null,
+      telegram_username: formProject.telegram_username || null,
+      address: formProject.address,
+      work_type: formProject.work_type,
+      // The schema expects materials/duration/cost field names (even if “photo” in base gets ignored by backend):
+      materials: formProject.materials,
+      duration: formProject.duration,
+      cost: formProject.cost,
+      execution_stages: formProject.execution_stages || null,
+      comment: formProject.comment || null,
+      start_date: formProject.start_date,
+      end_date: formProject.end_date
+      // Note: We do NOT send “photos” here. File storage is handled separately via /files/renovation/{id}.
+    };
+
     try {
-      let normalized;
+      let newProj;
       if (editingId) {
+        // UPDATE EXISTING
         const { data: updated } = await axios.put(
           `${API_URL}/renovation/projects/${editingId}/`,
-          formProject
+          payload
         );
-        normalized = {
-          ...updated,
-          photos: Array.isArray(updated.photos) ? updated.photos : []
-        };
-        setProjects(prev => prev.map(p => p.id === editingId ? normalized : p));
+        newProj = updated;
+        setProjects((prev) =>
+          prev.map((p) => (p.id === editingId ? updated : p))
+        );
       } else {
+        // CREATE NEW
         const { data: created } = await axios.post(
           `${API_URL}/renovation/projects/`,
-          formProject
+          payload
         );
-        normalized = {
-          ...created,
-          photos: Array.isArray(created.photos) ? created.photos : []
-        };
-        setProjects(prev => [...prev, normalized]);
+        newProj = created;
+        setProjects((prev) => [...prev, created]);
+        setEditingId(created.id);
       }
+
+      // 2) Upload ANY new files in formProject.photos (items having `file` property)
+      const projectId = newProj.id;
+      const toUpload = formProject.photos.filter((p) => p.file);
+      for (let photoItem of toUpload) {
+        const formData = new FormData();
+        formData.append('file', photoItem.file);
+        // If you want to send a “purpose” field, you can:
+        // formData.append('purpose', 'renovation')
+        await axios.post(
+          `${API_URL}/files/renovation/${projectId}`,
+          formData,
+          { headers: { 'Content-Type': 'multipart/form-data' } }
+        );
+      }
+
+      // 3) Re‐fetch existing photos from server so state is fresh
+      try {
+        const { data: freshFiles } = await axios.get(
+          `${API_URL}/files/renovation/${projectId}`
+        );
+        const existingPhotos = freshFiles.map((f) => ({
+          id: f.id,
+          file_path: f.file_path,
+          filename: f.filename
+        }));
+        setFormProject((prev) => ({ ...prev, photos: existingPhotos }));
+      } catch (err) {
+        console.error('Failed to re‐fetch uploaded photos:', err);
+      }
+
+      // 4) Finally, exit form (you could keep form open if you want further edits)
       cancelForm();
       setError('');
     } catch (err) {
-      console.error(err);
+      console.error('Error saving project:', err.response || err);
       setError('Error saving project.');
     }
   };
 
-  // Delete a project
-  const deleteProject = async id => {
+  // ─── DELETE A PROJECT ───────────────────────────────────────────────────────
+  const deleteProject = async (id) => {
     if (!window.confirm('Delete this project?')) return;
     try {
       await axios.delete(`${API_URL}/renovation/projects/${id}/`);
-      setProjects(prev => prev.filter(p => p.id !== id));
+      setProjects((prev) => prev.filter((p) => p.id !== id));
       setError('');
     } catch (err) {
-      console.error(err);
+      console.error('Failed to delete project:', err);
       setError('Failed to delete.');
     }
   };
 
-  // Placeholder for photo reordering
-  const handleDragEnd = ({ source, destination }) => {
-    if (!destination) return;
-    // implement reorder of formProject.photos if desired
-  };
-
-  // Export project summary as image
-  const exportPoster = async proj => {
+  // ─── EXPORT A SINGLE PROJECT AS AN IMAGE ───────────────────────────────────
+  const exportPoster = async (proj) => {
     const container = document.createElement('div');
     Object.assign(container.style, {
       padding: '20px',
@@ -219,46 +357,87 @@ const RenovationProjectsControl = () => {
     });
     container.innerHTML = `
       <h1>Renovation: ${proj.work_type}</h1>
-      <p>Address: ${proj.address}</p>
-      <p>Materials: ${proj.materials}</p>
-      <p>Duration: ${proj.duration}</p>
-      <p>Cost: ${proj.cost}</p>
-      <p>Dates: ${proj.start_date} to ${proj.end_date}</p>
-      <p>${proj.comment}</p>
+      <p><strong>Name:</strong> ${proj.name}</p>
+      <p><strong>Phone:</strong> ${proj.phone}</p>
+      <p><strong>Email:</strong> ${proj.email || '–'}</p>
+      <p><strong>Telegram:</strong> ${proj.telegram_username || '–'}</p>
+      <hr/>
+      <p><strong>Address:</strong> ${proj.address}</p>
+      <p><strong>Materials:</strong> ${proj.materials}</p>
+      <p><strong>Duration:</strong> ${proj.duration}</p>
+      <p><strong>Cost:</strong> ${proj.cost}</p>
+      <p><strong>Dates:</strong> ${proj.start_date} – ${proj.end_date}</p>
+      <p><strong>Stages:</strong> ${proj.execution_stages || '–'}</p>
+      <p><strong>Comment:</strong> ${proj.comment || '–'}</p>
     `;
     document.body.appendChild(container);
-    const canvas = await html2canvas(container, { useCORS: true, scale: 2 });
-    const link = document.createElement('a');
-    link.download = `renovation-${proj.id}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    document.body.removeChild(container);
+    try {
+      const canvas = await html2canvas(container, { useCORS: true, scale: 2 });
+      const link = document.createElement('a');
+      link.download = `renovation-${proj.id}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error('Export failed:', err);
+      setError('Export failed.');
+    } finally {
+      document.body.removeChild(container);
+    }
   };
 
-  // Calendar view
+  // ─── CALENDAR VIEW ──────────────────────────────────────────────────────────
   if (view === 'calendar' && selectedProject) {
     return (
       <RentalCalendar
         propertyId={selectedProject.id}
         category="Ремонт"
-        onBack={() => { setSelectedProject(null); setView('list'); }}
+        onBack={() => {
+          setSelectedProject(null);
+          setView('list');
+        }}
       />
     );
   }
 
-  // Main render
+  // ─── MAIN RENDER ────────────────────────────────────────────────────────────
   return (
-    <div className="container">
+    <div className="container" ref={exportRef}>
       <h2>Renovation Projects</h2>
 
-      {/* Filters */}
-      <section className="filters card">
+      {/* ─── Toolbar ────────────────────────────────────────────────────────────── */}
+      <div className="toolbar" style={{ marginBottom: 16 }}>
+        <button
+          onClick={() => {
+            cancelForm();
+            setView('form');
+          }}
+        >
+          + New Project
+        </button>
+        <button
+          onClick={() => {
+            if (!exportRef.current) return;
+            html2canvas(exportRef.current).then((canvas) => {
+              const link = document.createElement('a');
+              link.download = `renovation-projects-${view}.png`;
+              link.href = canvas.toDataURL();
+              link.click();
+            });
+          }}
+        >
+          Export View
+        </button>
+      </div>
+
+      {/* ─── Filters ────────────────────────────────────────────────────────────── */}
+      <section className="filters card" style={{ marginBottom: 16 }}>
         <input
           type="text"
-          placeholder="Search comments or stages"
+          placeholder="Search comments or stages..."
           value={searchText}
           onChange={handleFilterChange(setSearchText)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
         <input
           type="text"
@@ -266,6 +445,7 @@ const RenovationProjectsControl = () => {
           value={addressFilter}
           onChange={handleFilterChange(setAddressFilter)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
         <input
           type="text"
@@ -273,6 +453,7 @@ const RenovationProjectsControl = () => {
           value={workTypeFilter}
           onChange={handleFilterChange(setWorkTypeFilter)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
         <input
           type="number"
@@ -280,6 +461,7 @@ const RenovationProjectsControl = () => {
           value={durationMin}
           onChange={handleFilterChange(setDurationMin)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
         <input
           type="number"
@@ -287,6 +469,7 @@ const RenovationProjectsControl = () => {
           value={durationMax}
           onChange={handleFilterChange(setDurationMax)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
         <input
           type="number"
@@ -294,6 +477,7 @@ const RenovationProjectsControl = () => {
           value={costMin}
           onChange={handleFilterChange(setCostMin)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
         <input
           type="number"
@@ -301,181 +485,523 @@ const RenovationProjectsControl = () => {
           value={costMax}
           onChange={handleFilterChange(setCostMax)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
-        <label>Date From:</label>
+        <label style={{ marginRight: 4 }}>Date From:</label>
         <input
           type="date"
           value={dateFrom}
           onChange={handleFilterChange(setDateFrom)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
-        <label>Date To:</label>
+        <label style={{ marginRight: 4 }}>Date To:</label>
         <input
           type="date"
           value={dateTo}
           onChange={handleFilterChange(setDateTo)}
           className="filter-input animated"
+          style={{ marginRight: 8 }}
         />
-        <button
-          onClick={() => {
-            setFormProject(initialForm);
-            setEditingId(null);
-            setSelectedProject(null);
-            setView('form');
-          }}
-          className="advanced"
-        >
-          + New Project
-        </button>
       </section>
 
-      {/* List View */}
-      {loading ? (
-        <div>Loading projects...</div>
-      ) : error ? (
-        <div className="error">{error}</div>
-      ) : (
-        <section className="projects-list card">
-          {filteredProjects.map(proj => (
-            <article key={proj.id} className="project-card">
-              <header>
-                <h3>{proj.work_type} @ {proj.address}</h3>
-                <div className="actions">
-                  <button onClick={() => { setSelectedProject(proj); setView('calendar'); }}>📅</button>
-                  <button onClick={() => startEditing(proj)}>Edit</button>
-                  <button onClick={() => deleteProject(proj.id)}>Delete</button>
-                  <button onClick={() => exportPoster(proj)}>Export</button>
-                </div>
-              </header>
-              <div className="details">
-                <p><strong>Materials:</strong> {proj.materials}</p>
-                <p><strong>Duration:</strong> {proj.duration}</p>
-                <p><strong>Cost:</strong> {proj.cost}</p>
+      {/* ─── List View ─────────────────────────────────────────────────────────── */}
+      {view === 'list' && (
+        <>
+          {loading ? (
+            <p>Loading projects...</p>
+          ) : error ? (
+            <p className="error">{error}</p>
+          ) : (
+            <section className="projects-list">
+              <div
+                className="project-row header"
+                style={{
+                  display: 'flex',
+                  padding: '12px 16px',
+                  background: '#f7f7f7',
+                  borderRadius: 8,
+                  fontWeight: 'bold',
+                  marginBottom: 8
+                }}
+              >
+                <div style={{ flex: 0.5 }}>ID</div>
+                <div style={{ flex: 1 }}>Name</div>
+                <div style={{ flex: 1 }}>Phone</div>
+                <div style={{ flex: 1 }}>Email</div>
+                <div style={{ flex: 0.8 }}>Telegram</div>
+                <div style={{ flex: 1 }}>Address</div>
+                <div style={{ flex: 1 }}>Work Type</div>
+                <div style={{ flex: 0.8 }}>Duration</div>
+                <div style={{ flex: 0.8 }}>Cost</div>
+                <div style={{ flex: 1 }}>Dates</div>
+                <div style={{ flex: 1 }}>Actions</div>
               </div>
-            </article>
-          ))}
-        </section>
+
+              {paginatedProjects.length > 0 ? (
+                paginatedProjects.map((proj) => (
+                  <div
+                    key={proj.id}
+                    className="project-row"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 16px',
+                      background: '#fff',
+                      borderRadius: 8,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      marginBottom: 8
+                    }}
+                  >
+                    <div style={{ flex: 0.5 }}>{proj.id}</div>
+                    <div style={{ flex: 1 }}>{proj.name}</div>
+                    <div style={{ flex: 1 }}>{proj.phone}</div>
+                    <div style={{ flex: 1 }}>{proj.email || '–'}</div>
+                    <div style={{ flex: 0.8 }}>
+                      {proj.telegram_username || '–'}
+                    </div>
+                    <div style={{ flex: 1 }}>{proj.address}</div>
+                    <div style={{ flex: 1 }}>{proj.work_type}</div>
+                    <div style={{ flex: 0.8 }}>{proj.duration}</div>
+                    <div style={{ flex: 0.8 }}>{proj.cost}</div>
+                    <div style={{ flex: 1 }}>
+                      {proj.start_date} – {proj.end_date}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <button
+                        onClick={() => {
+                          setSelectedProject(proj);
+                          setView('calendar');
+                        }}
+                        style={{ marginRight: 8 }}
+                      >
+                        📅
+                      </button>
+                      <button
+                        onClick={() => startEditing(proj)}
+                        style={{ marginRight: 8 }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteProject(proj.id)}
+                        style={{ marginRight: 8 }}
+                      >
+                        Delete
+                      </button>
+                      <button onClick={() => exportPoster(proj)}>
+                        Export
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p>No renovation projects found.</p>
+              )}
+
+              {/* Pagination */}
+              {pageCount > 1 && (
+                <div className="pagination" style={{ marginTop: 16 }}>
+                  <button
+                    onClick={() =>
+                      setCurrentPage((cp) => Math.max(cp - 1, 1))
+                    }
+                    disabled={currentPage === 1}
+                    style={{ marginRight: 4 }}
+                  >
+                    ‹ Prev
+                  </button>
+                  {Array.from({ length: pageCount }, (_, i) => (
+                    <button
+                      key={i + 1}
+                      className={currentPage === i + 1 ? 'active' : ''}
+                      onClick={() => setCurrentPage(i + 1)}
+                      style={{ margin: '0 4px' }}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() =>
+                      setCurrentPage((cp) => Math.min(cp + 1, pageCount))
+                    }
+                    disabled={currentPage === pageCount}
+                    style={{ marginLeft: 4 }}
+                  >
+                    Next ›
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
+        </>
       )}
 
-      {/* Form View */}
+      {/* ─── FORM VIEW ─────────────────────────────────────────────────────────── */}
       {view === 'form' && (
-        <form className="project-form card" onSubmit={saveProject}>
-          <h3>{editingId ? 'Edit' : 'Add'} Renovation Project</h3>
-          <label>
-            Address:
-            <input
-              name="address"
-              value={formProject.address}
-              onChange={handleFormChange}
-              required
-            />
-          </label>
-          <label>
-            Work Type:
-            <input
-              name="work_type"
-              value={formProject.work_type}
-              onChange={handleFormChange}
-              required
-            />
-          </label>
-          <label>
-            Materials:
-            <input
-              name="materials"
-              value={formProject.materials}
-              onChange={handleFormChange}
-            />
-          </label>
-          <label>
-            Duration:
-            <input
-              name="duration"
-              value={formProject.duration}
-              onChange={handleFormChange}
-            />
-          </label>
-          <label>
-            Cost:
-            <input
-              name="cost"
-              value={formProject.cost}
-              onChange={handleFormChange}
-            />
-          </label>
-          <textarea
-            name="execution_stages"
-            value={formProject.execution_stages}
-            onChange={handleFormChange}
-            placeholder="Execution Stages"
-          />
-          <textarea
-            name="comment"
-            value={formProject.comment}
-            onChange={handleFormChange}
-            placeholder="Comment"
-          />
-          <label>
-            Start Date:
-            <input
-              type="date"
-              name="start_date"
-              value={formProject.start_date}
-              onChange={handleFormChange}
-              required
-            />
-          </label>
-          <label>
-            End Date:
-            <input
-              type="date"
-              name="end_date"
-              value={formProject.end_date}
-              onChange={handleFormChange}
-              required
-            />
-          </label>
-          <label>
-            Photos:
-            <input type="file" multiple onChange={handlePhotoUpload} />
-          </label>
-          <div className="photos-preview">
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="photos" direction="horizontal">
-                {provided => {
-                  const list = Array.isArray(formProject.photos) ? formProject.photos : [];
+        <section
+          className="project-form card"
+          style={{
+            background: '#fff',
+            borderRadius: 8,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+            padding: 16,
+            marginTop: 16
+          }}
+        >
+          <h3 style={{ marginTop: 0 }}>
+            {editingId ? 'Edit' : 'Add'} Renovation Project
+          </h3>
+          <form onSubmit={saveProject}>
+            {/* ─── NAME & PHONE ───────────────────────────────────────────────── */}
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Name</label>
+              <input
+                name="name"
+                value={formProject.name}
+                onChange={handleFormChange}
+                required
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Phone</label>
+              <input
+                name="phone"
+                value={formProject.phone}
+                onChange={handleFormChange}
+                required
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            {/* ─── EMAIL & TELEGRAM ─────────────────────────────────────────────── */}
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Email</label>
+              <input
+                name="email"
+                type="email"
+                value={formProject.email}
+                onChange={handleFormChange}
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Telegram</label>
+              <input
+                name="telegram_username"
+                value={formProject.telegram_username}
+                onChange={handleFormChange}
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            {/* ─── RENOVATION FIELDS ──────────────────────────────────────────────── */}
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Address</label>
+              <input
+                name="address"
+                value={formProject.address}
+                onChange={handleFormChange}
+                required
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Work Type</label>
+              <input
+                name="work_type"
+                value={formProject.work_type}
+                onChange={handleFormChange}
+                required
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Materials</label>
+              <input
+                name="materials"
+                value={formProject.materials}
+                onChange={handleFormChange}
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Duration</label>
+              <input
+                name="duration"
+                value={formProject.duration}
+                onChange={handleFormChange}
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Cost</label>
+              <input
+                name="cost"
+                type="number"
+                value={formProject.cost}
+                onChange={handleFormChange}
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'flex-start' }}
+            >
+              <label style={{ width: 120, marginTop: 8 }}>Execution Stages</label>
+              <textarea
+                name="execution_stages"
+                value={formProject.execution_stages}
+                onChange={handleFormChange}
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc',
+                  minHeight: 60
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'flex-start' }}
+            >
+              <label style={{ width: 120, marginTop: 8 }}>Comment</label>
+              <textarea
+                name="comment"
+                value={formProject.comment}
+                onChange={handleFormChange}
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc',
+                  minHeight: 60
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Start Date</label>
+              <input
+                name="start_date"
+                type="date"
+                value={formProject.start_date}
+                onChange={handleFormChange}
+                required
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>End Date</label>
+              <input
+                name="end_date"
+                type="date"
+                value={formProject.end_date}
+                onChange={handleFormChange}
+                required
+                style={{
+                  flex: 1,
+                  padding: 8,
+                  borderRadius: 4,
+                  border: '1px solid #ccc'
+                }}
+              />
+            </div>
+
+            {/* ─── PHOTO UPLOAD ────────────────────────────────────────────────────── */}
+            <div
+              className="form-row"
+              style={{ marginBottom: 12, display: 'flex', alignItems: 'center' }}
+            >
+              <label style={{ width: 120 }}>Photos</label>
+              <input
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handlePhotoUpload}
+                style={{
+                  flex: 1,
+                  padding: 4
+                }}
+              />
+            </div>
+
+            {/* ─── PHOTO PREVIEWS ───────────────────────────────────────────────────── */}
+            {formProject.photos && formProject.photos.length > 0 && (
+              <div
+                className="photos-preview"
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  marginBottom: 16
+                }}
+              >
+                {formProject.photos.map((photoItem) => {
+                  const src = photoItem.file_path
+                    ? `${photoItem.file_path}` // existing server file
+                    : photoItem.preview;       // local preview
                   return (
-                    <div ref={provided.innerRef} {...provided.droppableProps} className="photos-list">
-                      {list.map((ph, idx) => (
-                        <Draggable key={ph.id} draggableId={`${ph.id}`} index={idx}>
-                          {prov => (
-                            <div
-                              ref={prov.innerRef}
-                              {...prov.draggableProps}
-                              {...prov.dragHandleProps}
-                              className="photo-item"
-                            >
-                              <img
-                                src={ph.preview || ph.file_path}
-                                alt="photo"
-                                style={{ width: '80px', height: '80px', objectFit: 'cover' }}
-                              />
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
+                    <div
+                      key={photoItem.id}
+                      style={{
+                        position: 'relative',
+                        width: 80,
+                        height: 80,
+                        borderRadius: 4,
+                        overflow: 'hidden',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                      }}
+                    >
+                      <img
+                        src={`${API_URL}${src}`}
+                        alt="photo"
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDeletePhoto(photoItem)}
+                        style={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          background: 'rgba(0,0,0,0.6)',
+                          border: 'none',
+                          borderRadius: '50%',
+                          width: 20,
+                          height: 20,
+                          color: 'white',
+                          fontSize: 12,
+                          lineHeight: '20px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        &times;
+                      </button>
                     </div>
                   );
-                }}
-              </Droppable>
-            </DragDropContext>
-          </div>
-          <div className="form-actions">
-            <button type="submit" className="advanced">Save</button>
-            <button type="button" onClick={cancelForm} className="advanced">Cancel</button>
-          </div>
-        </form>
+                })}
+              </div>
+            )}
+
+            {/* ─── FORM ACTIONS ───────────────────────────────────────────────────── */}
+            <div className="form-actions" style={{ marginTop: 16 }}>
+              <button type="submit" className="advanced">
+                {editingId ? 'Save Changes' : 'Create Project'}
+              </button>
+              <button
+                type="button"
+                onClick={cancelForm}
+                className="advanced"
+                style={{ marginLeft: 8 }}
+              >
+                Cancel
+              </button>
+            </div>
+
+            {error && (
+              <p className="error" style={{ color: 'red', marginTop: 12 }}>
+                {error}
+              </p>
+            )}
+          </form>
+        </section>
       )}
     </div>
   );

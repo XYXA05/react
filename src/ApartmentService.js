@@ -6,9 +6,11 @@ export const getVerificationAds = async () => {
   const response = await fetch(`${BASE_URL}/admin/verification_ads`);
   return response.json();
 };
+
 export const getUniqueValues = (data, key) => {
   return [...new Set(data.map(item => item[key]))];
 };
+
 export const addTrapWord = async (word) => {
   const response = await fetch(`${BASE_URL}/admin/add_trap/`, {
     method: 'POST',
@@ -68,8 +70,35 @@ export const getApartmentsByStatus = async (status) => {
   return response.json();
 };
 
+// ── New: applyWatermark & removeWatermarkAI ──────────────────────────────
+export const applyWatermark = async (imageId, apartmentId) => {
+  const response = await fetch(
+    `${BASE_URL}/apartments/${apartmentId}/apply_watermark/${imageId}`,
+    { method: 'PUT' }
+  );
+  if (!response.ok) {
+    throw new Error('Failed to apply watermark');
+  }
+  return response.json();
+};
+
+export const removeWatermarkAI = async (imageId, apartmentId) => {
+  const response = await fetch(
+    `${BASE_URL}/apartments/${apartmentId}/remove_watermark_ai/${imageId}`,
+    { method: 'PUT' }
+  );
+  if (!response.ok) {
+    throw new Error('Failed to remove watermark using AI');
+  }
+  return response.json();
+};
+// ─────────────────────────────────────────────────────────────────────────
+
 export const deleteImage = async (imageId) => {
-  const response = await fetch(`${BASE_URL}/images/${imageId}`, { method: 'DELETE' });
+  // point at /apartments/images/{imageId} instead of /images/{imageId}
+  const response = await fetch(`${BASE_URL}/apartments/images/${imageId}`, {
+       method: 'DELETE'
+  });
   return response.json();
 };
 
@@ -159,11 +188,13 @@ export const getDistrictsAndCities = async () => {
   const data = await getApartments();
   const districtsSet = new Set();
   const citiesByDistrict = {};
+
   data.forEach(apartment => {
     const locationParts = apartment.location_date.split(', ');
     const district = locationParts[0];
     const city = locationParts[1] || '';
     districtsSet.add(district);
+
     if (!citiesByDistrict[district]) {
       citiesByDistrict[district] = [];
     }
@@ -171,26 +202,28 @@ export const getDistrictsAndCities = async () => {
       citiesByDistrict[district].push(city);
     }
   });
+
   return {
     districts: Array.from(districtsSet),
     citiesByDistrict
   };
 };
+
 export const addStopWord = async (word) => {
-    const response = await fetch(`${BASE_URL}/admin/add_stop_word/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ word })
-    });
-    return response.json();
-  };
-  
-export const removeStopWord = async (word) => {
-    const response = await fetch(`${BASE_URL}/admin/remove_stop_word/${word}`, {
-      method: 'DELETE'
-    });
-    return response.json();
+  const response = await fetch(`${BASE_URL}/admin/add_stop_word/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ word })
+  });
+  return response.json();
 };
-  
-// Optionally export BASE_URL if needed in your component
+
+export const removeStopWord = async (word) => {
+  const response = await fetch(`${BASE_URL}/admin/remove_stop_word/${word}`, {
+    method: 'DELETE'
+  });
+  return response.json();
+};
+
+// (Optional) Export BASE_URL if you need it elsewhere
 export { BASE_URL };
