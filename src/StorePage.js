@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app';
 
 export default function StorePage({ token, onBack }) {
   const emptyForm = {

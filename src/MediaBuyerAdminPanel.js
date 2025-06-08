@@ -5,7 +5,7 @@ import html2canvas from 'html2canvas';
 import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 
 // Backend endpoint base
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app';
 
 // MediaBuyer Admin Panel component
 const MediaBuyerAdminPanel = () => {

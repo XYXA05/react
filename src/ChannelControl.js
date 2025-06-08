@@ -16,7 +16,7 @@ const ChannelControl = () => {
   const typeDeals = ['kvartiry', 'doma', 'posutochno-pochasovo'];
   const typeObjects = ['prodazha-kvartir', 'prodazha-domov', 'dolgosrochnaya-arenda-kvartir', 'posutochno-pochasovo-kvartiry'];
 
-  const apiUrl = 'http://127.0.0.1:8000';
+  const apiUrl = 'https://79cf-217-31-72-114.ngrok-free.app';
 
   useEffect(() => {
     getChannels();

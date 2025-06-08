@@ -6,7 +6,7 @@ import RentalCalendar from './RentalCalendar';
 import html2canvas from 'html2canvas';
 import './control.css';
 
-const API_URL = 'http://localhost:8000'; // adjust if needed
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app'; // adjust if needed
 const PAGE_SIZE = 10;
 
 function CleaningControl() {

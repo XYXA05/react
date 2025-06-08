@@ -5,9 +5,9 @@ import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import html2canvas from 'html2canvas';
 import RentalCalendar from './RentalCalendar';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app';
 const FILE_MODULE = 'products';   // ← use "products" as the module for store apartments
-const BACKEND = 'http://127.0.0.1:8000'
+const BACKEND = 'https://79cf-217-31-72-114.ngrok-free.app'
 function StoreAdmin() {
   // ─── VIEW STATE ─────────────────────────────────────────────────────────────
   const [view, setView] = useState('list');            // 'list' | 'form' | 'calendar'

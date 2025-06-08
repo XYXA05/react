@@ -15,7 +15,7 @@ const ActionLogsMonitoring = () => {
   const [queryParamsFilter, setQueryParamsFilter] = useState("");
   const [timestampFilter, setTimestampFilter] = useState("");
 
-  const API_URL = "http://localhost:8000";
+  const API_URL = "https://79cf-217-31-72-114.ngrok-free.app";
 
   // Fetch logs from the backend API
   useEffect(() => {

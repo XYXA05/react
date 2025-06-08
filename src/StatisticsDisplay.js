@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import axios from 'axios'
 import './StatisticsDisplay.css'
 
-const API_URL = 'http://localhost:8000'
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app'
 
 // Якщо потрібно змінити відповідність ролей → модулі, правте тут.
 const roleModulesMap = {

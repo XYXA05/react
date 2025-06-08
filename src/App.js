@@ -22,7 +22,7 @@ import AdminOrdersPanel     from './AdminOrdersPanel';
 import AdminMenuManager from './AdminMenuManager';  // NEW: Menu Manager
 import StorePage from './StorePage';
 
-const API_URL = 'http://localhost:8000'; // Replace with your backend URL
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app'; // Replace with your backend URL
 
 function App() {
   // Save token and role (persisted with localStorage)

@@ -7,7 +7,7 @@ import html2canvas from 'html2canvas';
 import RentalCalendar from './RentalCalendar';
 import './control.css';
 
-const API_URL = 'http://localhost:8000'; // adjust if necessary
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app'; // adjust if necessary
 const PAGE_SIZE = 10;
 
 const DesignProjectsControl = () => {

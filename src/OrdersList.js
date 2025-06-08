@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = 'https://79cf-217-31-72-114.ngrok-free.app';
 const token = localStorage.getItem('ACCESS_TOKEN');
 if (token) {
   axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;

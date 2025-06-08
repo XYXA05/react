@@ -13,7 +13,7 @@ const CreateUser = () => {
     e.preventDefault();
     try {
       // Choose endpoint based on userType
-      const endpoint = userType === 'realtor' ? 'http://127.0.0.1:8000/register/realtor' : 'http://127.0.0.1:8000/register/team_leader';
+      const endpoint = userType === 'realtor' ? 'https://79cf-217-31-72-114.ngrok-free.app/register/realtor' : 'https://79cf-217-31-72-114.ngrok-free.app/register/team_leader';
       const payload = { username, password, name, chat_id };
       const response = await axios.post(endpoint, payload);
       setMessage(`User ${response.data.username} created successfully!`);
